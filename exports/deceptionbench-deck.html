@@ -107,6 +107,31 @@
   }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.bold { font-weight: 700; }
+  .charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 36px;
+    margin: 0 0 20px;
+  }
+  .chart-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 0 0 6px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 4px;
+  }
+  .chart svg { display: block; width: 100%; }
+  .chart text {
+    font-family: var(--mono);
+    font-size: 11px;
+    fill: var(--ink);
+  }
+  .chart text.label { text-anchor: end; }
+  .chart text.value { text-anchor: start; }
+  .chart .bar { fill: var(--ink); }
+  .chart .axis { stroke: var(--ink); stroke-width: 0.5; }
   .pull {
     font-family: var(--serif);
     font-size: clamp(20px, 2vw, 26px);
@@ -257,13 +282,153 @@
   <h2>Headline results &mdash; v3</h2>
   <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>. gpt-5.4 wins 29 of 30 trials across 3 seeds.</p>
 
+  <div class="charts">
+    <div class="chart">
+      <p class="chart-title">Win rate</p>
+      <svg viewBox="0 0 420 150" preserveAspectRatio="xMinYMin meet">
+        <!-- 100% baseline -->
+        <line class="axis" x1="100" y1="6" x2="100" y2="148" />
+        <line class="axis" x1="320" y1="6" x2="320" y2="148" />
+        <text x="100" y="146" font-size="9">0%</text>
+        <text x="320" y="146" font-size="9" text-anchor="end">100%</text>
+
+        <!-- gpt-5.5: 13/13 = 100% -->
+        <text class="label" x="95" y="22">gpt-5.5</text>
+        <rect class="bar" x="100" y="14" width="220" height="10" />
+        <text class="value" x="324" y="22">100% (13/13)</text>
+
+        <!-- gpt-5.4: 29/30 = 96.7% -->
+        <text class="label" x="95" y="44">gpt-5.4</text>
+        <rect class="bar" x="100" y="36" width="212.7" height="10" />
+        <text class="value" x="324" y="44">97% (29/30)</text>
+
+        <!-- gpt-5: 8/8 = 100% -->
+        <text class="label" x="95" y="66">gpt-5</text>
+        <rect class="bar" x="100" y="58" width="220" height="10" />
+        <text class="value" x="324" y="66">100% (8/8)</text>
+
+        <!-- o4-mini-h: 8/8 = 100% -->
+        <text class="label" x="95" y="88">o4-mini-h</text>
+        <rect class="bar" x="100" y="80" width="220" height="10" />
+        <text class="value" x="324" y="88">100% (8/8)</text>
+
+        <!-- o3-high: 7/11 = 63.6% -->
+        <text class="label" x="95" y="110">o3-high</text>
+        <rect class="bar" x="100" y="102" width="140" height="10" />
+        <text class="value" x="324" y="110">64% (7/11)</text>
+      </svg>
+    </div>
+
+    <div class="chart">
+      <p class="chart-title">Mean steps to win</p>
+      <svg viewBox="0 0 360 150" preserveAspectRatio="xMinYMin meet">
+        <!-- axis: 0 to 60 steps -->
+        <line class="axis" x1="100" y1="6" x2="100" y2="148" />
+        <line class="axis" x1="320" y1="6" x2="320" y2="148" />
+        <text x="100" y="146" font-size="9">0</text>
+        <text x="320" y="146" font-size="9" text-anchor="end">60 steps</text>
+
+        <!-- bar widths: scale = (steps / 60) * 220 -->
+        <!-- gpt-5.5: 21 steps -->
+        <text class="label" x="95" y="22">gpt-5.5</text>
+        <rect class="bar" x="100" y="14" width="77" height="10" />
+        <text class="value" x="181" y="22">21</text>
+
+        <!-- gpt-5.4: 27 steps -->
+        <text class="label" x="95" y="44">gpt-5.4</text>
+        <rect class="bar" x="100" y="36" width="99" height="10" />
+        <text class="value" x="203" y="44">27</text>
+
+        <!-- gpt-5: 25 steps -->
+        <text class="label" x="95" y="66">gpt-5</text>
+        <rect class="bar" x="100" y="58" width="92" height="10" />
+        <text class="value" x="196" y="66">25</text>
+
+        <!-- o4-mini-h: 29 steps -->
+        <text class="label" x="95" y="88">o4-mini-h</text>
+        <rect class="bar" x="100" y="80" width="106" height="10" />
+        <text class="value" x="210" y="88">29</text>
+
+        <!-- o3-high: 46 steps -->
+        <text class="label" x="95" y="110">o3-high</text>
+        <rect class="bar" x="100" y="102" width="169" height="10" />
+        <text class="value" x="273" y="110">46</text>
+      </svg>
+    </div>
+
+    <div class="chart">
+      <p class="chart-title">Mean reasoning tokens (where reported)</p>
+      <svg viewBox="0 0 360 150" preserveAspectRatio="xMinYMin meet">
+        <line class="axis" x1="100" y1="6" x2="100" y2="148" />
+        <line class="axis" x1="320" y1="6" x2="320" y2="148" />
+        <text x="100" y="146" font-size="9">0</text>
+        <text x="320" y="146" font-size="9" text-anchor="end">35,000</text>
+
+        <!-- gpt-5.5: 3,000 -->
+        <text class="label" x="95" y="22">gpt-5.5</text>
+        <rect class="bar" x="100" y="14" width="18.9" height="10" />
+        <text class="value" x="123" y="22">~3K</text>
+
+        <!-- gpt-5.4: not reported -->
+        <text class="label" x="95" y="44">gpt-5.4</text>
+        <rect class="bar" x="100" y="36" width="0" height="10" />
+        <text class="value" x="104" y="44" font-style="italic">n/r</text>
+
+        <!-- gpt-5: 21,000 -->
+        <text class="label" x="95" y="66">gpt-5</text>
+        <rect class="bar" x="100" y="58" width="132" height="10" />
+        <text class="value" x="236" y="66">~21K</text>
+
+        <!-- o4-mini-h: 30,000 -->
+        <text class="label" x="95" y="88">o4-mini-h</text>
+        <rect class="bar" x="100" y="80" width="188.6" height="10" />
+        <text class="value" x="293" y="88">~30K</text>
+
+        <!-- o3-high: 26,000 -->
+        <text class="label" x="95" y="110">o3-high</text>
+        <rect class="bar" x="100" y="102" width="163.4" height="10" />
+        <text class="value" x="268" y="110">~26K</text>
+      </svg>
+    </div>
+
+    <div class="chart">
+      <p class="chart-title">Cost-of-solving asymmetry (gpt-5.5 vs the rest)</p>
+      <svg viewBox="0 0 360 150" preserveAspectRatio="xMinYMin meet">
+        <text x="180" y="20" text-anchor="middle" font-size="11" font-weight="700">reasoning_tokens / steps (per win)</text>
+        <line class="axis" x1="40" y1="36" x2="40" y2="138" />
+        <line class="axis" x1="40" y1="138" x2="340" y2="138" />
+
+        <!-- gpt-5.5: ~143 tokens/step -->
+        <rect class="bar" x="60" y="118" width="20" height="20" />
+        <text x="70" y="114" text-anchor="middle">~143</text>
+        <text x="70" y="146" text-anchor="middle" font-size="9">gpt-5.5</text>
+
+        <!-- gpt-5: ~840 -->
+        <rect class="bar" x="120" y="78" width="20" height="60" />
+        <text x="130" y="74" text-anchor="middle">~840</text>
+        <text x="130" y="146" text-anchor="middle" font-size="9">gpt-5</text>
+
+        <!-- o4-mini-h: ~1034 -->
+        <rect class="bar" x="180" y="65" width="20" height="73" />
+        <text x="190" y="61" text-anchor="middle">~1034</text>
+        <text x="190" y="146" text-anchor="middle" font-size="9">o4-mini-h</text>
+
+        <!-- o3-high: ~565 -->
+        <rect class="bar" x="240" y="98" width="20" height="40" />
+        <text x="250" y="94" text-anchor="middle">~565</text>
+        <text x="250" y="146" text-anchor="middle" font-size="9">o3-high</text>
+      </svg>
+    </div>
+  </div>
+
   <table>
     <thead>
       <tr>
         <th>Model</th>
         <th class="num">Wins / N</th>
+        <th class="num">%</th>
         <th class="num">Mean steps</th>
-        <th class="num">Mean reasoning tokens</th>
+        <th class="num">Mean reasoning tok</th>
         <th>Note</th>
       </tr>
     </thead>
@@ -271,6 +436,7 @@
       <tr>
         <td class="bold">gpt-5.5</td>
         <td class="num bold">13 / 13</td>
+        <td class="num bold">100%</td>
         <td class="num">~21</td>
         <td class="num">~3,000</td>
         <td>Most efficient by a wide margin.</td>
@@ -278,6 +444,7 @@
       <tr>
         <td class="bold">gpt-5.4</td>
         <td class="num bold">29 / 30</td>
+        <td class="num bold">97%</td>
         <td class="num">~27</td>
         <td class="num">&mdash;</td>
         <td><strong>Largest sample</strong> (30 trials &times; 3 seeds); 1 task loss.</td>
@@ -285,6 +452,7 @@
       <tr>
         <td class="bold">gpt-5</td>
         <td class="num">8 / 8</td>
+        <td class="num bold">100%</td>
         <td class="num">~25</td>
         <td class="num">~21,000</td>
         <td>Wins, but ~7&times; gpt-5.5's spend.</td>
@@ -292,6 +460,7 @@
       <tr>
         <td class="bold">o4-mini-high</td>
         <td class="num">8 / 8</td>
+        <td class="num bold">100%</td>
         <td class="num">~29</td>
         <td class="num">~30,000</td>
         <td>Wins consistently, heavy thinker.</td>
@@ -299,9 +468,10 @@
       <tr>
         <td class="bold">o3-high</td>
         <td class="num">7 / 11</td>
+        <td class="num bold">64%</td>
         <td class="num">~46</td>
         <td class="num">~26,000</td>
-        <td><strong>Only model in the small-sample lineup with task losses</strong> (4 budget-exhausted).</td>
+        <td><strong>Only model with task losses</strong> (4 budget-exhausted).</td>
       </tr>
     </tbody>
   </table>
