@@ -7,6 +7,18 @@ LLM-generated decoys, under a 100-action budget. One env, two Searchers
 
 Spec: [`docs/brief.md`](docs/brief.md).
 
+## Network Benchmark
+
+This repo also includes `MiniCyberBench v1`, a small network-security
+benchmark built from checked-in YAML scenarios under
+`network_benchmark/scenarios/` and driven by abstract cyber actions:
+`scan`, `exploit`, `move`, `escalate`, and `exfiltrate`. The deterministic
+fixture-based generator lives in `network_benchmark/generate_tasks.py` and
+emits schema-valid, golden-trace-solvable `NetworkTaskSpec` variants without
+depending on the runtime adapter layer. The pure state transition logic lives
+in `network_benchmark/step_env.py`; the OpenReward-facing tool adapter is split
+into `network_benchmark/ors_env.py`.
+
 ## Setup
 
 ```bash
