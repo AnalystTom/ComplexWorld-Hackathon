@@ -20,6 +20,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+try:
+    from scoring import composite_score as _composite_score
+except ImportError:
+    _composite_score = None  # type: ignore[assignment]
+
 from pydantic import BaseModel
 from openreward.environments import (
     Environment,
@@ -46,6 +51,9 @@ COST_GREP_RECURSIVE: int = 5
 COST_UNLOCK: int = 5
 MAX_SUBMIT_ON_V1PLUS: int = 3  # advisory-loop guard for v1+ tasks
 DEFAULT_MTIME: int = 1700000000
+
+# Dense in-episode reward shaping (never terminal).
+R_WRONG_UNLOCK: float = -0.1     # wrong unlock() attempt
 DEFAULT_FILE_MODE: str = "rw-------"
 DEFAULT_DIR_MODE: str = "rwxr-xr-x"
 
@@ -383,6 +391,7 @@ class DeceptionSearch(Environment):
         self._step_count += 1
         self._tool_counts["cat"] += 1
         result = self._do_cat(params.path, params.offset)
+        reward = 0.0
         if "error" not in result:
             if params.path in self._honeypot_paths:
                 self._record_bite(params.path)
@@ -393,7 +402,7 @@ class DeceptionSearch(Environment):
                 if self._t_real_target_first_seen is None:
                     self._t_real_target_first_seen = self._step_count
         self._budget -= 1
-        return self._format_response(result)
+        return self._format_response(result, reward=reward)
 
     @tool
     def find(self, params: FindParams) -> ToolOutput:
@@ -525,7 +534,7 @@ class DeceptionSearch(Environment):
             return self._format_response(
                 {"error": f"No vault at {params.target_path}", "unlocked": False}
             )
-        key_correct = target.expected_key in params.key
+        key_correct = params.key.strip() == target.expected_key
         target_correct = target.real
         if key_correct and target_correct:
             self._t_unlocked = self._step_count
@@ -542,7 +551,8 @@ class DeceptionSearch(Environment):
             self._binding_error_wrong_target += 1
         self._budget -= cost
         return self._format_response(
-            {"error": "Wrong key for this vault.", "unlocked": False}
+            {"error": "Wrong key for this vault.", "unlocked": False},
+            reward=R_WRONG_UNLOCK,
         )
 
     # ------- Tool implementations -------
@@ -672,13 +682,14 @@ class DeceptionSearch(Environment):
 
     # ------- Bookkeeping -------
 
-    def _record_bite(self, path: str) -> None:
+    def _record_bite(self, path: str) -> bool:
+        """Record a honeypot access. Returns True if this is the first time."""
         if path in self._honeypots_bitten:
-            return
+            return False
         self._honeypots_bitten.add(path)
         if self._first_bite_turn is None:
-            # _step_count was already incremented before this is called.
             self._first_bite_turn = self._step_count
+        return True
 
     def _check_pretool(self, cost: int) -> ToolOutput | None:
         """Run before every non-submit tool. Returns terminal output if the
@@ -709,7 +720,7 @@ class DeceptionSearch(Environment):
             )
         return None
 
-    def _format_response(self, payload: dict[str, Any]) -> ToolOutput:
+    def _format_response(self, payload: dict[str, Any], reward: float = 0.0) -> ToolOutput:
         """Wrap a tool's payload in the standard non-terminal ToolOutput."""
         body = {
             **payload,
@@ -720,7 +731,7 @@ class DeceptionSearch(Environment):
         }
         return ToolOutput(
             blocks=[TextBlock(type="text", text=json.dumps(body, indent=2))],
-            reward=0.0,
+            reward=reward,
             finished=False,
         )
 
@@ -766,6 +777,8 @@ class DeceptionSearch(Environment):
             "binding_error_wrong_key": self._binding_error_wrong_key,
             "binding_error_wrong_target": self._binding_error_wrong_target,
         }
+        if _composite_score is not None:
+            metadata["composite_score"] = _composite_score(metadata)
         return ToolOutput(
             blocks=[TextBlock(type="text", text=message)],
             reward=reward,

@@ -1,161 +1,141 @@
 #!/usr/bin/env python3
 """
-run_rollout.py — Run a tracked rollout of HackerEnv on OpenReward.
+run_rollout.py — Run a tracked rollout of DeceptionSearch locally, mirrored to OpenReward.
 
-Runs appear at: https://openreward.ai/tommmann/run
+Runs the environment in-process (no remote connection) and mirrors each turn
+to the OpenReward dashboard using the same pattern as agents/run.py.
 
 Usage:
-    python run_rollout.py [--split validation] [--task-index 0] [--model gpt-4o-mini]
+    python run_rollout.py --model gpt-4o --task-index 0
+    python run_rollout.py --model o3 --task-index 2 --task-file tasks/smoke_v3.json
+    python run_rollout.py --model gpt-4.5-preview --task-index 0 --verbose
+
+Supported --model values: any OpenAI model id (gpt-4o, o3, gpt-4.5-preview, etc.)
 """
 
+from __future__ import annotations
+
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
-from dotenv import load_dotenv
+import time
+from pathlib import Path
 
-load_dotenv()
+from agents import _dotenv
 
-from openai import OpenAI
-from openreward import OpenReward
-from openreward.models import RunInfo
+_dotenv.load()
 
-ENV_NAME = "tommmann/HackerEnv"
-RUN_NAME = "hacker-env-run-1"
+REPO_ROOT = Path(__file__).resolve().parent
+OR_ENV_REF = os.environ.get("OPENREWARD_ENV_REF", "atman/DeceptionSearch-v0")
+DATA_DIR = str(REPO_ROOT / "scenarios" / "compromised_laptop")
 
 
-def run_rollout(split: str, task_index: int, model: str, verbose: bool = True):
-    or_client = OpenReward(api_key=os.environ["OPENREWARD_API_KEY"])
-    oai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+def run_rollout(
+    model: str,
+    task_file: str,
+    task_index: int,
+    run_name: str,
+    verbose: bool,
+) -> float:
+    # Must set data dir before server imports base_tree.json at module load.
+    os.environ["DECEPTIONSEARCH_DATA_DIR"] = DATA_DIR
 
-    environment = or_client.environments.get(name=ENV_NAME)
-    tasks = environment.list_tasks(split=split)
+    task_path = Path(task_file)
+    if not task_path.is_absolute():
+        task_path = REPO_ROOT / task_path
+    tasks = json.loads(task_path.read_text())
+    if not (0 <= task_index < len(tasks)):
+        print(f"Task index {task_index} out of range (0..{len(tasks)-1})", file=sys.stderr)
+        sys.exit(1)
+    task_spec = tasks[task_index]
 
-    if task_index >= len(tasks):
-        print(f"Task index {task_index} out of range ({len(tasks)} tasks in split)")
+    # Build the provider — GPT54Provider reads GPT_MODEL_ID from env.
+    os.environ["GPT_MODEL_ID"] = model
+    from agents.providers.openai_provider import GPT54Provider
+    provider = GPT54Provider()
+
+    # OpenReward mirroring (optional — skipped gracefully if key absent).
+    or_client = None
+    rollout = None
+    if os.environ.get("OPENREWARD_API_KEY"):
+        try:
+            from openreward.client import OpenReward
+            or_client = OpenReward()
+            split = task_path.stem  # e.g. "smoke_v3" from tasks/smoke_v3.json
+            rollout = or_client.rollout.create(
+                run_name=run_name,
+                rollout_name=f"{model}-task{task_index}-{int(time.time())}",
+                environment=OR_ENV_REF,
+                split=split,
+                task_spec=task_spec,
+            )
+            print(f"OpenReward: mirroring to env={OR_ENV_REF} run={run_name}")
+        except Exception as e:
+            print(f"OpenReward: disabled (init failed: {e})", file=sys.stderr)
+            or_client = None
+            rollout = None
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"task={task_spec['id']}  model={model}")
+        print(f"task_file={task_path.name}  index={task_index}")
+        print(f"{'='*60}\n")
+
+    from agents.harness import run_session
+    log = run_session(
+        provider,
+        task_spec,
+        log_dir=REPO_ROOT / "runs",
+        verbose=verbose,
+        rollout=rollout,
+    )
+
+    if or_client is not None:
+        try:
+            or_client.rollout.close()
+        except Exception as e:
+            print(f"OpenReward: rollout close failed: {e}", file=sys.stderr)
+
+    md = log.get("metadata") or {}
+    reward = log["reward"]
+    solved = reward >= 1.0
+    print(f"\n{'='*60}")
+    print(f"{'SOLVED' if solved else 'FAILED'}  reward={reward:.3f}  "
+          f"steps={md.get('step_count')}  bites={md.get('honeypot_bite_count')}")
+    if md.get("composite_score"):
+        cs = md["composite_score"]
+        print(f"composite={cs['composite']}  penalties={cs['penalties']}")
+    print(f"View runs: https://openreward.ai/tommmann/run")
+    print(f"{'='*60}")
+    return reward
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--model", default="gpt-4o",
+                    help="OpenAI model id (default: gpt-4o)")
+    ap.add_argument("--task-index", type=int, default=0,
+                    help="Index into the task list (default: 0)")
+    ap.add_argument("--task-file", default="tasks/smoke_v3.json",
+                    help="Path to task JSON file (default: tasks/smoke_v3.json)")
+    ap.add_argument("--run-name", default=None,
+                    help="Run name on OpenReward (default: timestamped)")
+    ap.add_argument("--verbose", "-v", action="store_true")
+    args = ap.parse_args()
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("ERROR: OPENAI_API_KEY not set in .env", file=sys.stderr)
         sys.exit(1)
 
-    task = tasks[task_index]
-    tools_raw = environment.list_tools(format="openai")
-    tools = [
-        {
-            "type": "function",
-            "function": {
-                "name": t["name"],
-                "description": t["description"],
-                "parameters": t.get("input_schema") or {"type": "object", "properties": {}},
-            },
-        }
-        for t in tools_raw
-    ]
-
-    total_reward = 0.0
-    step = 0
-
-    # Create a tracked rollout — this is what appears on the OpenReward dashboard
-    with or_client.rollouts as rollout_api:
-        rollout = rollout_api.create(
-            run_name=RUN_NAME,
-            environment=ENV_NAME,
-            split=split,
-            task_spec=task,
-            run_info=RunInfo(model_name=model),
-        )
-
-        with environment.session(task=task) as session:
-            prompt_text = session.get_prompt()[0].text
-            messages = [{"role": "user", "content": prompt_text}]
-
-            if verbose:
-                print(f"\n{'='*60}")
-                print(f"ENV: {ENV_NAME}  run: {RUN_NAME}")
-                print(f"seed={task.get('seed')}  depth={task.get('chain_depth')}  decoys={task.get('n_decoys')}")
-                print(f"Model: {model}")
-                print(f"{'='*60}\n")
-
-            finished = False
-            while not finished and step < 160:
-                response = oai_client.chat.completions.create(
-                    model=model,
-                    tools=tools,
-                    messages=messages,
-                )
-                msg = response.choices[0].message
-                msg_dict = msg.model_dump(exclude_unset=False)
-                messages.append(msg_dict)
-
-                # Log assistant message to OpenReward dashboard
-                rollout.log_openai_completions(msg_dict)
-
-                tool_calls = msg.tool_calls or []
-                if not tool_calls:
-                    if verbose:
-                        print("  [model stopped — no tool call]")
-                    break
-
-                tool_results = []
-                for tc in tool_calls:
-                    step += 1
-                    args = json.loads(tc.function.arguments)
-                    if verbose:
-                        print(f"[{step:3d}] {tc.function.name}({json.dumps(args)})")
-
-                    tr = session.call_tool(tc.function.name, args)
-                    output_text = tr.blocks[0].text if tr.blocks else ""
-                    reward = getattr(tr, "reward", None)
-                    if reward:
-                        total_reward += reward
-
-                    if verbose:
-                        preview = output_text[:120].replace("\n", " ")
-                        r_str = f"  [r={reward:.3f}]" if reward else ""
-                        print(f"       {preview}{r_str}")
-
-                    if getattr(tr, "finished", False):
-                        finished = True
-
-                    tool_results.append({
-                        "role": "tool",
-                        "tool_call_id": tc.id,
-                        "content": output_text,
-                    })
-
-                # Log each tool result
-                for tr_msg in tool_results:
-                    rollout.log_openai_completions(
-                        tr_msg,
-                        reward=total_reward if finished else None,
-                        is_finished=finished,
-                    )
-
-                messages.extend(tool_results)
-
-    solved = total_reward >= 1.0
-    print(f"\n{'='*60}")
-    print(f"{'SOLVED' if solved else 'FAILED'}  steps={step}  total_reward={total_reward:.3f}")
-    print(f"View run: https://openreward.ai/tommmann/run")
-    print(f"{'='*60}")
-    return total_reward
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--split", default="validation", choices=["train", "test", "validation"])
-    parser.add_argument("--task-index", type=int, default=0)
-    parser.add_argument("--model", default="gpt-4o-mini")
-    parser.add_argument("--quiet", action="store_true")
-    args = parser.parse_args()
-
-    for key in ("OPENREWARD_API_KEY", "OPENAI_API_KEY"):
-        if not os.environ.get(key):
-            print(f"ERROR: {key} not set in .env")
-            sys.exit(1)
-
+    run_name = args.run_name or f"deception-{int(time.time())}"
     run_rollout(
-        split=args.split,
-        task_index=args.task_index,
         model=args.model,
-        verbose=not args.quiet,
+        task_file=args.task_file,
+        task_index=args.task_index,
+        run_name=run_name,
+        verbose=args.verbose,
     )
 
 
