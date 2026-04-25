@@ -534,5 +534,7 @@ class DeceptionSearch(Environment):
 # Entrypoint
 # ---------------------------------------------------------------------------
 
+from environment import HackerEnv
+
 if __name__ == "__main__":
-    Server([DeceptionSearch]).run()
+    Server([DeceptionSearch, HackerEnv]).run()
