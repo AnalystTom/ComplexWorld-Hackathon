@@ -1,122 +1,141 @@
 #!/usr/bin/env python3
 """
-run_rollout.py — Run a single rollout of the HackerEnv on OpenReward.
+run_rollout.py — Run a tracked rollout of DeceptionSearch locally, mirrored to OpenReward.
+
+Runs the environment in-process (no remote connection) and mirrors each turn
+to the OpenReward dashboard using the same pattern as agents/run.py.
 
 Usage:
-    python run_rollout.py [--split train|test|dev] [--task-index 0] [--model MODEL]
+    python run_rollout.py --model gpt-4o --task-index 0
+    python run_rollout.py --model o3 --task-index 2 --task-file tasks/smoke_v3.json
+    python run_rollout.py --model gpt-4.5-preview --task-index 0 --verbose
 
-API keys are loaded from .env (copy .env.example -> .env and fill in).
+Supported --model values: any OpenAI model id (gpt-4o, o3, gpt-4.5-preview, etc.)
 """
 
+from __future__ import annotations
+
+import argparse
+import json
 import os
 import sys
-import json
-import argparse
-from dotenv import load_dotenv
+import time
+from pathlib import Path
 
-load_dotenv()
+from agents import _dotenv
 
-import anthropic
-from openreward import OpenReward
+_dotenv.load()
 
-ENV_NAME = "HackerEnv"   # update once uploaded to OpenReward
+REPO_ROOT = Path(__file__).resolve().parent
+OR_ENV_REF = os.environ.get("OPENREWARD_ENV_REF", "atman/DeceptionSearch-v0")
+DATA_DIR = str(REPO_ROOT / "scenarios" / "compromised_laptop")
 
 
-def run_rollout(split: str, task_index: int, model: str, verbose: bool = True):
-    or_client = OpenReward(api_key=os.environ["OPENREWARD_API_KEY"])
-    ant_client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+def run_rollout(
+    model: str,
+    task_file: str,
+    task_index: int,
+    run_name: str,
+    verbose: bool,
+) -> float:
+    # Must set data dir before server imports base_tree.json at module load.
+    os.environ["DECEPTIONSEARCH_DATA_DIR"] = DATA_DIR
 
-    environment = or_client.environments.get(name=ENV_NAME)
-    tasks = environment.list_tasks(split=split)
+    task_path = Path(task_file)
+    if not task_path.is_absolute():
+        task_path = REPO_ROOT / task_path
+    tasks = json.loads(task_path.read_text())
+    if not (0 <= task_index < len(tasks)):
+        print(f"Task index {task_index} out of range (0..{len(tasks)-1})", file=sys.stderr)
+        sys.exit(1)
+    task_spec = tasks[task_index]
 
-    if task_index >= len(tasks):
-        print(f"Task index {task_index} out of range (split has {len(tasks)} tasks)")
+    # Build the provider — GPT54Provider reads GPT_MODEL_ID from env.
+    os.environ["GPT_MODEL_ID"] = model
+    from agents.providers.openai_provider import GPT54Provider
+    provider = GPT54Provider()
+
+    # OpenReward mirroring (optional — skipped gracefully if key absent).
+    or_client = None
+    rollout = None
+    if os.environ.get("OPENREWARD_API_KEY"):
+        try:
+            from openreward.client import OpenReward
+            or_client = OpenReward()
+            split = task_path.stem  # e.g. "smoke_v3" from tasks/smoke_v3.json
+            rollout = or_client.rollout.create(
+                run_name=run_name,
+                rollout_name=f"{model}-task{task_index}-{int(time.time())}",
+                environment=OR_ENV_REF,
+                split=split,
+                task_spec=task_spec,
+            )
+            print(f"OpenReward: mirroring to env={OR_ENV_REF} run={run_name}")
+        except Exception as e:
+            print(f"OpenReward: disabled (init failed: {e})", file=sys.stderr)
+            or_client = None
+            rollout = None
+
+    if verbose:
+        print(f"\n{'='*60}")
+        print(f"task={task_spec['id']}  model={model}")
+        print(f"task_file={task_path.name}  index={task_index}")
+        print(f"{'='*60}\n")
+
+    from agents.harness import run_session
+    log = run_session(
+        provider,
+        task_spec,
+        log_dir=REPO_ROOT / "runs",
+        verbose=verbose,
+        rollout=rollout,
+    )
+
+    if or_client is not None:
+        try:
+            or_client.rollout.close()
+        except Exception as e:
+            print(f"OpenReward: rollout close failed: {e}", file=sys.stderr)
+
+    md = log.get("metadata") or {}
+    reward = log["reward"]
+    solved = reward >= 1.0
+    print(f"\n{'='*60}")
+    print(f"{'SOLVED' if solved else 'FAILED'}  reward={reward:.3f}  "
+          f"steps={md.get('step_count')}  bites={md.get('honeypot_bite_count')}")
+    if md.get("composite_score"):
+        cs = md["composite_score"]
+        print(f"composite={cs['composite']}  penalties={cs['penalties']}")
+    print(f"View runs: https://openreward.ai/tommmann/run")
+    print(f"{'='*60}")
+    return reward
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--model", default="gpt-4o",
+                    help="OpenAI model id (default: gpt-4o)")
+    ap.add_argument("--task-index", type=int, default=0,
+                    help="Index into the task list (default: 0)")
+    ap.add_argument("--task-file", default="tasks/smoke_v3.json",
+                    help="Path to task JSON file (default: tasks/smoke_v3.json)")
+    ap.add_argument("--run-name", default=None,
+                    help="Run name on OpenReward (default: timestamped)")
+    ap.add_argument("--verbose", "-v", action="store_true")
+    args = ap.parse_args()
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        print("ERROR: OPENAI_API_KEY not set in .env", file=sys.stderr)
         sys.exit(1)
 
-    task = tasks[task_index]
-    tools = environment.list_tools(format="anthropic")
-
-    total_reward = 0.0
-    step = 0
-
-    with environment.session(task=task) as session:
-        prompt_text = session.get_prompt()[0].text
-        messages = [{"role": "user", "content": prompt_text}]
-
-        if verbose:
-            print(f"\n{'='*60}")
-            print(f"Task: split={split}, index={task_index}, seed={task.get('seed')}")
-            print(f"Model: {model}")
-            print(f"{'='*60}\n")
-
-        finished = False
-        while not finished:
-            step += 1
-            message = ant_client.messages.create(
-                model=model,
-                max_tokens=4096,
-                tools=tools,
-                messages=messages,
-            )
-
-            messages.append({"role": "assistant", "content": message.content})
-
-            tool_results = []
-            for block in message.content:
-                if getattr(block, "type", None) == "tool_use":
-                    if verbose:
-                        print(f"[step {step:3d}] CALL  {block.name}({json.dumps(block.input)})")
-
-                    tr = session.call_tool(block.name, block.input)
-                    output_text = tr.blocks[0].text if tr.blocks else ""
-
-                    if verbose:
-                        preview = output_text[:120].replace("\n", " ")
-                        reward_str = f"  reward={tr.reward:.3f}" if tr.reward else ""
-                        print(f"           OUT   {preview}{reward_str}")
-
-                    if tr.reward:
-                        total_reward += tr.reward
-
-                    if getattr(tr, "finished", False):
-                        finished = True
-
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": output_text,
-                    })
-
-            if tool_results:
-                messages.append({"role": "user", "content": tool_results})
-
-            # Guard: if model stops without calling a tool, end episode
-            if message.stop_reason not in ("tool_use", "end_turn") or (
-                message.stop_reason == "end_turn" and not finished
-            ):
-                if verbose:
-                    print(f"[step {step}] Model stopped without tool call. Ending.")
-                break
-
-    print(f"\n--- Episode complete ---")
-    print(f"Steps: {step}  |  Total reward: {total_reward:.3f}")
-    return total_reward
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Run a HackerEnv rollout on OpenReward")
-    parser.add_argument("--split", default="validation", choices=["train", "test", "validation"])
-    parser.add_argument("--task-index", type=int, default=0)
-    parser.add_argument("--model", default="claude-haiku-4-5-20251001",
-                        help="Anthropic model ID (haiku for cheap testing, sonnet for quality)")
-    parser.add_argument("--quiet", action="store_true")
-    args = parser.parse_args()
-
+    run_name = args.run_name or f"deception-{int(time.time())}"
     run_rollout(
-        split=args.split,
-        task_index=args.task_index,
         model=args.model,
-        verbose=not args.quiet,
+        task_file=args.task_file,
+        task_index=args.task_index,
+        run_name=run_name,
+        verbose=args.verbose,
     )
 
 

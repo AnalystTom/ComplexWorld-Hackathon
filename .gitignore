@@ -1,5 +1,22 @@
-.env
-.worktrees/
-.venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.local
+*.swp
+.DS_Store
+
+# Rollout logs (per-session, regenerated)
+runs/
+
+# Pytest
+.pytest_cache/
+
+# Repo material we ingest at build time (not source of truth)
+scenarios/compromised_laptop/_source/
+
+# Editor / IDE
+.vscode/
+.idea/

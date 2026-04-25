@@ -1,2 +1,9 @@
-openreward
-pydantic
+pydantic>=2.0
+openreward>=0.1
+
+# OpenAI SDK — used for both GPT-5.4 (direct) and Haiku/Gemini (via OpenRouter)
+openai>=1.50
+
+# Optional: native google-genai SDK. Only used by build_tasks.py when
+# OPENROUTER_API_KEY is unset and GEMINI_API_KEY is set.
+google-genai>=0.3
