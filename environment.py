@@ -32,6 +32,7 @@ from openreward.environments import (
 )
 
 from filesystem_gen import VirtualFilesystem, build_filesystem, verify_secret
+from network_benchmark.ors_env import NetworkBenchmarkEnv
 
 
 # ---------------------------------------------------------------------------
@@ -345,7 +346,12 @@ class HackerEnv(Environment):
 # Server entry point
 # ---------------------------------------------------------------------------
 
+
+def get_hosted_environment_classes() -> list[type[Environment]]:
+    return [NetworkBenchmarkEnv, HackerEnv]
+
+
 if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
-    Server([HackerEnv]).run(port=port)
+    Server(get_hosted_environment_classes()).run(port=port)
