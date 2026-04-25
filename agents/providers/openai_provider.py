@@ -188,7 +188,7 @@ class GPT54Provider(OpenAICompatibleProvider):
         # the tool call. Default 2048 leaves no room. Bump for both families.
         if is_o_series:
             defaults["max_completion_tokens"] = int(
-                os.environ.get("MAX_COMPLETION_TOKENS", "131072")  # ~128K
+                os.environ.get("MAX_COMPLETION_TOKENS", "65536")  # 64K (safe for o3/o4-mini)
             )
             defaults["reasoning_effort"] = os.environ.get(
                 "REASONING_EFFORT", "high"
