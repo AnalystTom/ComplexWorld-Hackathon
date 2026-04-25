@@ -48,14 +48,16 @@ class OpenAICompatibleProvider(Provider):
         self.tools = to_openai()
         self._extra_headers = extra_headers or {}
         self._messages: list[dict[str, Any]] = []
-        self._pending_call_id: str | None = None
+        self._pending_tool_calls: list[Any] = []
+        self._active_call_id: str | None = None
         self._last_logged: int = 0
 
     def last_call_id(self) -> str | None:
-        return self._pending_call_id
+        return self._active_call_id
 
     def flush_assistants(self, rollout) -> None:
         """Log all unlogged system/user/assistant messages to the rollout.
+
         Tool messages are skipped here — the harness logs them with reward.
         """
         for msg in self._messages[self._last_logged:]:
@@ -71,14 +73,17 @@ class OpenAICompatibleProvider(Provider):
         return self._call_model()
 
     def step(self, last_result: str) -> tuple[str, dict[str, Any]]:
-        assert self._pending_call_id is not None
+        assert self._active_call_id is not None
         self._messages.append(
             {
                 "role": "tool",
-                "tool_call_id": self._pending_call_id,
+                "tool_call_id": self._active_call_id,
                 "content": last_result,
             }
         )
+        self._active_call_id = None
+        if self._pending_tool_calls:
+            return self._pop_pending_tool_call()
         return self._call_model()
 
     def _call_model(self) -> tuple[str, dict[str, Any]]:
@@ -97,20 +102,18 @@ class OpenAICompatibleProvider(Provider):
         response = self.client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         msg = choice.message
-        # Re-serialise the assistant message; if the model emitted parallel
-        # tool calls anyway (older Anthropic via OpenRouter sometimes does),
-        # keep only the first so the next user/tool reply round-trips cleanly.
-        m = msg.model_dump(exclude_none=True)
-        if m.get("tool_calls") and len(m["tool_calls"]) > 1:
-            m["tool_calls"] = m["tool_calls"][:1]
-        self._messages.append(m)
+        self._messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
             raise RuntimeError(
                 f"{self.name} returned no tool_calls; "
                 f"finish_reason={choice.finish_reason}"
             )
-        tc = msg.tool_calls[0]
-        self._pending_call_id = tc.id
+        self._pending_tool_calls = list(msg.tool_calls)
+        return self._pop_pending_tool_call()
+
+    def _pop_pending_tool_call(self) -> tuple[str, dict[str, Any]]:
+        tc = self._pending_tool_calls.pop(0)
+        self._active_call_id = tc.id
         return tc.function.name, json.loads(tc.function.arguments)
 
 
