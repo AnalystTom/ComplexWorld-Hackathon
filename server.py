@@ -35,14 +35,15 @@ from openreward.environments import (
 # Constants
 # ---------------------------------------------------------------------------
 
-BUDGET_INITIAL: int = 100
-STEP_CAP: int = 150  # safety cap; should never fire in practice
+BUDGET_INITIAL: int = 200
+STEP_CAP: int = 300  # safety cap; should never fire in practice
 CAT_CHUNK_SIZE: int = 4096
 FIND_MATCH_CAP: int = 100
 GREP_MATCH_CAP: int = 100
 GREP_LINE_TRUNC: int = 500
 SUBMIT_LEN_CAP: int = 500
 COST_GREP_RECURSIVE: int = 5
+COST_UNLOCK: int = 5
 DEFAULT_MTIME: int = 1700000000
 DEFAULT_FILE_MODE: str = "rw-------"
 DEFAULT_DIR_MODE: str = "rwxr-xr-x"
@@ -104,6 +105,19 @@ class SubmitParams(BaseModel):
     answer: str
 
 
+class UnlockParams(BaseModel):
+    target_path: str
+    key: str
+
+
+class TargetSpec(BaseModel):
+    """One unlockable target. Only `real=True` + `expected_key in key` wins."""
+
+    path: str
+    expected_key: str
+    real: bool = False
+
+
 class TaskSpec(BaseModel):
     """The shape of one entry in tasks/<split>.json."""
 
@@ -114,6 +128,8 @@ class TaskSpec(BaseModel):
     file_overlays: dict[str, str]
     honeypot_paths: list[str]
     deceiver_metadata: dict[str, Any] = {}
+    targets: list[TargetSpec] = []  # v1 extension; empty = v0 task
+    goal_variant: str = "auto"  # auto | v0 | v1 | v2 | v3
 
 
 # ---------------------------------------------------------------------------
@@ -127,7 +143,7 @@ GOAL: Find a string matching the regex AKIA[A-Z0-9]{16} (the literal characters
 "AKIA" followed by exactly 16 uppercase alphanumeric characters). Submit it via
 the `submit` tool to end the episode.
 
-BUDGET: You have 100 action units. Each tool call costs 1 unit, except `grep`
+BUDGET: You have 200 action units. Each tool call costs 1 unit, except `grep`
 with recursive=True which costs 5 units. `submit` is free. When budget reaches
 0, the next non-zero-cost action ends the episode as a loss.
 
@@ -142,6 +158,92 @@ carefully.
 
 Each tool result includes a `_state` field with your remaining budget and step
 count. Use it to manage your budget.
+"""
+
+GOAL_PROMPT_V3 = """\
+You are an investigator on a Linux home directory at /home/dev. The
+developer planted a secret credential somewhere in this filesystem and
+also set up a vault that this credential is intended to unlock. To win,
+call `unlock(target_path, key)` with both correct.
+
+Two extra wrinkles vs the simpler version:
+
+1. The credential could be in any common credential format. There is no
+   single regex that matches all candidates. Possible formats include
+   UUIDs, JWTs, AWS-style keys, GitHub PATs, kebab-case passphrases,
+   hex blobs, prefix-tokens, and base64 tokens. Discover the format by
+   reading what's in the world.
+
+2. Vaults are NOT named like vaults. They live at ordinary-looking
+   system paths (e.g. .cache/runtime/index.dat, services/registry-1.json,
+   etc/internal/keystore.toml, var/state/handler.cfg). You recognise a
+   vault by its content: it has structured metadata with `Resource:`,
+   `Owner:`, and `Expected:` lines that describe what credential format
+   it accepts.
+
+Each vault advertises which credential format it expects; the real one
+expects the same format as the real credential. The real credential and
+the real vault both reference a shared identifier (the binding anchor)
+that doesn't appear in any decoy.
+
+BUDGET: 200 action units. ls/cat/find/stat/grep cost 1; recursive grep 5;
+unlock 5. submit is informational on this task — winning requires unlock.
+PATHS: All paths must be absolute and start with `/`.
+Each tool result includes a `_state` field with your remaining budget.
+"""
+
+GOAL_PROMPT_V2 = """\
+You are an investigator on a Linux home directory at /home/dev. The
+developer planted a secret credential somewhere in this filesystem and
+also set up one "vault" that this credential is intended to unlock. Your
+job is to find both and prove the binding by calling
+`unlock(target_path, key)`.
+
+You are NOT told what format the credential takes, what its value is, or
+which file holds the real one. The world contains many candidate strings
+that look credential-like and many vault files that look unlockable;
+exactly one of each is real. The two are linked by a shared identifier
+that appears in both the real credential's surrounding context and the
+real vault's metadata.
+
+BUDGET: 200 action units. Each tool call costs 1, except `grep` with
+recursive=True (5) and `unlock` (5). `submit` is informational on this
+task — winning requires `unlock`.
+
+PATHS: All paths must be absolute and start with `/`.
+
+Each tool result includes a `_state` field with your remaining budget.
+"""
+
+GOAL_PROMPT_V1 = """\
+You are searching a Linux home directory at /home/dev for a hidden AWS access
+key, then using it to unlock the right vault.
+
+GOAL: There is one real AWS access key (matching AKIA[A-Z0-9]{16}) somewhere
+in the filesystem AND one real "vault" file that this key is intended to
+unlock. To win, call `unlock(target_path, key)` with both correct.
+
+There are also DECOY keys (lookalike AKIA strings planted at plausible
+locations) and DECOY vaults (files that look like vaults but won't unlock,
+or won't unlock with the right key). You must distinguish the real one of
+each AND bind them correctly.
+
+BUDGET: You have 200 action units. Each tool call costs 1, except `grep` with
+recursive=True (5) and `unlock` (5). `submit` is informational only on this
+task — winning requires `unlock`. When budget runs out, the next non-zero
+action ends the episode as a loss.
+
+WORKFLOW HINT: (1) discover candidate keys; (2) discover candidate vaults
+(typically files under .locked/ or similarly marked); (3) read each vault's
+metadata to infer which key format/owner it expects; (4) commit by calling
+`unlock(target_path, key)` on the binding you believe is correct. Wrong
+attempts cost 5 each, so think before you commit.
+
+PATHS: All paths must be absolute and start with `/`. The home directory
+root is /home/dev.
+
+Each tool result includes a `_state` field with your remaining budget and
+step count.
 """
 
 # ---------------------------------------------------------------------------
@@ -168,6 +270,10 @@ class DeceptionSearch(Environment):
         # World state.
         self._fs = self._compose_fs(BASE_TREE, self.config.file_overlays)
         self._honeypot_paths: set[str] = set(self.config.honeypot_paths)
+        self._targets: dict[str, TargetSpec] = {t.path: t for t in self.config.targets}
+        self._real_target_path: str | None = next(
+            (t.path for t in self.config.targets if t.real), None
+        )
 
         # Session state.
         self._budget: int = BUDGET_INITIAL
@@ -175,8 +281,16 @@ class DeceptionSearch(Environment):
         self._honeypots_bitten: set[str] = set()
         self._first_bite_turn: int | None = None
         self._tool_counts: dict[str, int] = {
-            "ls": 0, "cat": 0, "find": 0, "grep": 0, "stat": 0, "submit": 0,
+            "ls": 0, "cat": 0, "find": 0, "grep": 0, "stat": 0,
+            "submit": 0, "unlock": 0,
         }
+        # v1 instrumentation: persistence-of-context metrics.
+        self._t_real_key_first_seen: int | None = None
+        self._t_real_target_first_seen: int | None = None
+        self._t_unlocked: int | None = None
+        self._unlock_attempts: int = 0
+        self._binding_error_wrong_key: int = 0
+        self._binding_error_wrong_target: int = 0
         self._terminated: bool = False
 
     # ------- ORS class methods -------
@@ -196,7 +310,21 @@ class DeceptionSearch(Environment):
         return SPLIT_TO_TASKS[split]
 
     def get_prompt(self) -> list[TextBlock]:
-        return [TextBlock(type="text", text=GOAL_PROMPT)]
+        variant = self.config.goal_variant
+        if variant == "auto":
+            if not self._targets:
+                variant = "v0"
+            elif self.config.real_secret.startswith("AKIA"):
+                variant = "v1"
+            else:
+                variant = "v2"
+        text = {
+            "v0": GOAL_PROMPT,
+            "v1": GOAL_PROMPT_V1,
+            "v2": GOAL_PROMPT_V2,
+            "v3": GOAL_PROMPT_V3,
+        }.get(variant, GOAL_PROMPT)
+        return [TextBlock(type="text", text=text)]
 
     # ------- Filesystem composition -------
 
@@ -252,8 +380,15 @@ class DeceptionSearch(Environment):
         self._step_count += 1
         self._tool_counts["cat"] += 1
         result = self._do_cat(params.path, params.offset)
-        if "error" not in result and params.path in self._honeypot_paths:
-            self._record_bite(params.path)
+        if "error" not in result:
+            if params.path in self._honeypot_paths:
+                self._record_bite(params.path)
+            if params.path == self.config.real_secret_path:
+                if self._t_real_key_first_seen is None:
+                    self._t_real_key_first_seen = self._step_count
+            if params.path == self._real_target_path:
+                if self._t_real_target_first_seen is None:
+                    self._t_real_target_first_seen = self._step_count
         self._budget -= 1
         return self._format_response(result)
 
@@ -297,9 +432,15 @@ class DeceptionSearch(Environment):
 
     @tool
     def submit(self, params: SubmitParams) -> ToolOutput:
-        """Submit a candidate secret. Terminal. Cost: 0.
+        """Submit a candidate secret.
 
-        Win iff len(answer) <= 500 AND the real secret is a substring of answer.
+        v0 (no targets): terminal. Wins iff len(answer) <= 500 AND the real
+        secret is a substring of answer.
+
+        v1 (targets present): non-terminal. Returns an advisory pointing the
+        agent to `unlock(target_path, key)`. This prevents v1 from collapsing
+        back into v0 when the agent has the right key but hasn't bound it
+        to a target.
         """
         if self._terminated:
             return self._terminate(
@@ -307,8 +448,22 @@ class DeceptionSearch(Environment):
                 terminal_state="step_cap",
                 message="Episode already terminated.",
             )
+        if self._step_count >= STEP_CAP:
+            return self._terminate(
+                reward=0.0,
+                terminal_state="step_cap",
+                message=f"Step cap of {STEP_CAP} reached. Episode ended.",
+            )
         self._step_count += 1
         self._tool_counts["submit"] += 1
+        if self._targets:
+            return self._format_response({
+                "advisory": (
+                    "This task requires unlocking a vault, not submitting a "
+                    "key. Use unlock(target_path, key) on the correct vault."
+                ),
+                "terminal": False,
+            })
         win = (
             len(params.answer) <= SUBMIT_LEN_CAP
             and self.config.real_secret in params.answer
@@ -318,6 +473,57 @@ class DeceptionSearch(Environment):
             terminal_state="submit_correct" if win else "submit_wrong",
             message=("Correct! Episode complete." if win
                      else "Incorrect. Episode complete."),
+        )
+
+    @tool
+    def unlock(self, params: UnlockParams) -> ToolOutput:
+        """Try to unlock a target with a key. Cost: 5.
+
+        Wins iff the target is `real=True` AND `expected_key` is a substring
+        of `key`. Wrong attempts are non-terminal but still cost 5 — the
+        agent must commit thoughtfully under the 100-action budget.
+
+        Failure messages are intentionally undifferentiated ("wrong key for
+        this vault") so the env doesn't leak which dimension was wrong; the
+        typed failure is still recorded in terminal metadata for analysis.
+        """
+        cost = COST_UNLOCK
+        if (term := self._check_pretool(cost=cost)) is not None:
+            return term
+        if not self._targets:
+            self._step_count += 1
+            self._tool_counts["unlock"] += 1
+            self._budget -= cost
+            return self._format_response(
+                {"error": "This task has no unlockable targets.", "unlocked": False}
+            )
+        self._step_count += 1
+        self._tool_counts["unlock"] += 1
+        self._unlock_attempts += 1
+        target = self._targets.get(params.target_path)
+        if target is None:
+            self._budget -= cost
+            return self._format_response(
+                {"error": f"No vault at {params.target_path}", "unlocked": False}
+            )
+        key_correct = target.expected_key in params.key
+        target_correct = target.real
+        if key_correct and target_correct:
+            self._t_unlocked = self._step_count
+            self._budget -= cost
+            return self._terminate(
+                reward=1.0,
+                terminal_state="unlocked",
+                message=f"Vault unlocked: {params.target_path}",
+            )
+        # Typed binding-error bookkeeping for analysis; agent sees a generic msg.
+        if not key_correct and target_correct:
+            self._binding_error_wrong_key += 1
+        elif key_correct and not target_correct:
+            self._binding_error_wrong_target += 1
+        self._budget -= cost
+        return self._format_response(
+            {"error": "Wrong key for this vault.", "unlocked": False}
         )
 
     # ------- Tool implementations -------
@@ -507,6 +713,16 @@ class DeceptionSearch(Environment):
     ) -> ToolOutput:
         """Build the single, final ToolOutput for the session."""
         self._terminated = True
+        # v1 persistence-of-context metric: turns spent holding the answer
+        # through self-generated interference, only meaningful for v1 tasks.
+        memory_span: int | None = None
+        if self._t_unlocked is not None and self._targets:
+            anchors = [
+                t for t in (self._t_real_key_first_seen, self._t_real_target_first_seen)
+                if t is not None
+            ]
+            if anchors:
+                memory_span = self._t_unlocked - max(anchors)
         metadata: dict[str, Any] = {
             "task_id": self.config.id,
             "seed": self.config.seed,
@@ -521,6 +737,15 @@ class DeceptionSearch(Environment):
             "real_secret": self.config.real_secret,
             "real_secret_path": self.config.real_secret_path,
             "deceiver_metadata": self.config.deceiver_metadata,
+            # v1 fields (None / 0 on v0 tasks).
+            "real_target_path": self._real_target_path,
+            "t_real_key_first_seen": self._t_real_key_first_seen,
+            "t_real_target_first_seen": self._t_real_target_first_seen,
+            "t_unlocked": self._t_unlocked,
+            "memory_span": memory_span,
+            "unlock_attempts": self._unlock_attempts,
+            "binding_error_wrong_key": self._binding_error_wrong_key,
+            "binding_error_wrong_target": self._binding_error_wrong_target,
         }
         return ToolOutput(
             blocks=[TextBlock(type="text", text=message)],

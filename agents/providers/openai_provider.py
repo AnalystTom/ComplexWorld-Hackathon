@@ -51,6 +51,9 @@ class OpenAICompatibleProvider(Provider):
         self._pending_tool_calls: list[Any] = []
         self._active_call_id: str | None = None
         self._last_logged: int = 0
+        # Per-turn token bookkeeping (free from each Chat Completions response).
+        self._turn_usage: list[dict[str, Any]] = []
+        self._reasoning_tokens_total: int = 0
 
     def last_call_id(self) -> str | None:
         return self._active_call_id
@@ -102,7 +105,30 @@ class OpenAICompatibleProvider(Provider):
         response = self.client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         msg = choice.message
-        self._messages.append(msg.model_dump(exclude_none=True))
+        # Capture token usage for memory/context analysis.
+        usage = response.usage
+        if usage is not None:
+            ct_details = getattr(usage, "completion_tokens_details", None)
+            pt_details = getattr(usage, "prompt_tokens_details", None)
+            reasoning = getattr(ct_details, "reasoning_tokens", None) if ct_details else None
+            cached = getattr(pt_details, "cached_tokens", None) if pt_details else None
+            self._turn_usage.append({
+                "turn_index": len(self._turn_usage) + 1,
+                "prompt_tokens": getattr(usage, "prompt_tokens", None),
+                "completion_tokens": getattr(usage, "completion_tokens", None),
+                "total_tokens": getattr(usage, "total_tokens", None),
+                "reasoning_tokens": reasoning,
+                "cached_tokens": cached,
+            })
+            if reasoning:
+                self._reasoning_tokens_total += reasoning
+        # Re-serialise the assistant message; if the model emitted parallel
+        # tool calls anyway (older Anthropic via OpenRouter sometimes does),
+        # keep only the first so the next user/tool reply round-trips cleanly.
+        m = msg.model_dump(exclude_none=True)
+        if m.get("tool_calls") and len(m["tool_calls"]) > 1:
+            m["tool_calls"] = m["tool_calls"][:1]
+        self._messages.append(m)
         if not msg.tool_calls:
             raise RuntimeError(
                 f"{self.name} returned no tool_calls; "
@@ -128,12 +154,16 @@ _OPENROUTER_HEADERS = {
 
 
 class GPT54Provider(OpenAICompatibleProvider):
-    """GPT-5.4 via OpenAI directly. Uses OPENAI_API_KEY."""
+    """OpenAI GPT model. Defaults to gpt-5.4 unless GPT_MODEL_ID is set."""
 
     def __init__(self, **kwargs: Any):
+        model_id = os.environ.get("GPT_MODEL_ID", "gpt-5.4")
         super().__init__(
-            name="gpt-5.4",
-            model_id=os.environ.get("GPT_MODEL_ID", "gpt-5.4"),
+            # Use the actual model id as the label so OR rollouts and local
+            # logs distinguish gpt-5.4 / gpt-5.5 / gpt-4o etc when running
+            # the same harness with different GPT_MODEL_ID overrides.
+            name=model_id,
+            model_id=model_id,
             api_key_env_var="OPENAI_API_KEY",
             base_url=None,
             **kwargs,
@@ -141,14 +171,15 @@ class GPT54Provider(OpenAICompatibleProvider):
 
 
 class HaikuProvider(OpenAICompatibleProvider):
-    """Claude Haiku 4.5 via OpenRouter. Uses OPENROUTER_API_KEY."""
+    """Claude (default Haiku 4.5) via OpenRouter. Uses OPENROUTER_API_KEY."""
 
     def __init__(self, **kwargs: Any):
+        model_id = os.environ.get("HAIKU_MODEL_ID", "anthropic/claude-haiku-4.5")
+        # Strip the OpenRouter org/ prefix for a cleaner rollout label.
+        label = model_id.split("/", 1)[-1]
         super().__init__(
-            name="haiku-4-5",
-            model_id=os.environ.get(
-                "HAIKU_MODEL_ID", "anthropic/claude-haiku-4.5"
-            ),
+            name=label,
+            model_id=model_id,
             api_key_env_var="OPENROUTER_API_KEY",
             base_url="https://openrouter.ai/api/v1",
             extra_headers=_OPENROUTER_HEADERS,

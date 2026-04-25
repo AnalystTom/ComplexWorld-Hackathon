@@ -154,9 +154,13 @@ def main() -> None:
             )
             rollout = None
             if or_client is not None and agent_name in ("haiku", "gpt54"):
+                # Use the provider's actual model id (e.g. gpt-5.5, gpt-4o)
+                # for the rollout label so OR's UI distinguishes runs that
+                # share an --agent CLI flag but vary GPT_MODEL_ID.
+                rollout_label = f"{provider.name}-trial{trial+1}"
                 rollout = or_client.rollout.create(
                     run_name=or_run_name,
-                    rollout_name=f"{agent_name}-trial{trial+1}",
+                    rollout_name=rollout_label,
                     environment=or_env_ref,
                     split=or_split,
                     task_spec=task_spec,
@@ -169,6 +173,7 @@ def main() -> None:
                 rollout=rollout,
             )
             md = log.get("metadata") or {}
+            n_planted = len(task_spec.get("honeypot_paths") or []) or "?"
             summary.append(
                 {
                     "agent": agent_name,
@@ -180,13 +185,21 @@ def main() -> None:
                     "budget_used": md.get("budget_used"),
                     "step_count": md.get("step_count"),
                     "tool_histogram": md.get("tool_histogram"),
+                    "reasoning_tokens_total": md.get("reasoning_tokens_total"),
+                    "final_prompt_tokens": md.get("final_prompt_tokens"),
                 }
             )
+            extras = ""
+            if md.get("reasoning_tokens_total") is not None:
+                extras += f" reasoning_tok={md['reasoning_tokens_total']}"
+            if md.get("final_prompt_tokens") is not None:
+                extras += f" final_ctx={md['final_prompt_tokens']}"
             print(
                 f"  -> reward={log['reward']:.1f} "
                 f"state={md.get('terminal_state')} "
                 f"steps={md.get('step_count')} "
-                f"bites={md.get('honeypot_bite_count')}/15"
+                f"bites={md.get('honeypot_bite_count')}/{n_planted}"
+                f"{extras}"
             )
 
     print("\n=== SUMMARY ===")

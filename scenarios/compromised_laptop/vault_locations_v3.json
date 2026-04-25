@@ -1,0 +1,22 @@
+[
+  "/home/dev/.cache/runtime/index.dat",
+  "/home/dev/.cache/svc/registry-eu.json",
+  "/home/dev/.config/svc/state-cache.bin",
+  "/home/dev/.local/share/svc/handler-2.cfg",
+  "/home/dev/.local/share/registry/index-3.json",
+  "/home/dev/projects/sentry-self-hosted/var/state/handler.cfg",
+  "/home/dev/projects/sentry-self-hosted/var/run/runtime.pid",
+  "/home/dev/projects/sentry-self-hosted/var/cache/lookup.dat",
+  "/home/dev/projects/sentry-self-hosted/var/lib/internal/state.cfg",
+  "/home/dev/projects/sentry-self-hosted/services/registry-1.json",
+  "/home/dev/projects/sentry-self-hosted/services/router.cfg",
+  "/home/dev/projects/sentry-self-hosted/services/profile/registry-us.json",
+  "/home/dev/projects/sentry-self-hosted/services/handlers/lookup.cfg",
+  "/home/dev/projects/sentry-self-hosted/etc/internal/keystore.toml",
+  "/home/dev/projects/sentry-self-hosted/etc/handlers/profile-1.json",
+  "/home/dev/projects/sentry-self-hosted/etc/handler-cache.bin",
+  "/home/dev/projects/sentry-self-hosted/system/runtime.cfg",
+  "/home/dev/projects/sentry-self-hosted/data/handler-state.bin",
+  "/home/dev/projects/sentry-self-hosted/data/handlers/state-eu.bin",
+  "/home/dev/projects/sentry-self-hosted/lib/index.dat"
+]
