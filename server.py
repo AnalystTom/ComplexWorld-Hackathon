@@ -40,7 +40,7 @@ from openreward.environments import (
 # Constants
 # ---------------------------------------------------------------------------
 
-BUDGET_INITIAL: int = 200
+BUDGET_INITIAL: int = 100
 STEP_CAP: int = 300  # safety cap; should never fire in practice
 CAT_CHUNK_SIZE: int = 4096
 FIND_MATCH_CAP: int = 100
@@ -152,7 +152,7 @@ GOAL: Find a string matching the regex AKIA[A-Z0-9]{16} (the literal characters
 "AKIA" followed by exactly 16 uppercase alphanumeric characters). Submit it via
 the `submit` tool to end the episode.
 
-BUDGET: You have 200 action units. Each tool call costs 1 unit, except `grep`
+BUDGET: You have 100 action units. Each tool call costs 1 unit, except `grep`
 with recursive=True which costs 5 units. `submit` is free. When budget reaches
 0, the next non-zero-cost action ends the episode as a loss.
 
@@ -197,7 +197,7 @@ expects the same format as the real credential. The real credential and
 the real vault both reference a shared identifier (the binding anchor)
 that doesn't appear in any decoy.
 
-BUDGET: 200 action units. ls/cat/find/stat/grep cost 1; recursive grep 5;
+BUDGET: 100 action units. ls/cat/find/stat/grep cost 1; recursive grep 5;
 unlock 5. submit is informational on this task — winning requires unlock.
 PATHS: All paths must be absolute and start with `/`.
 Each tool result includes a `_state` field with your remaining budget.
@@ -217,7 +217,7 @@ exactly one of each is real. The two are linked by a shared identifier
 that appears in both the real credential's surrounding context and the
 real vault's metadata.
 
-BUDGET: 200 action units. Each tool call costs 1, except `grep` with
+BUDGET: 100 action units. Each tool call costs 1, except `grep` with
 recursive=True (5) and `unlock` (5). `submit` is informational on this
 task — winning requires `unlock`.
 
@@ -239,7 +239,7 @@ locations) and DECOY vaults (files that look like vaults but won't unlock,
 or won't unlock with the right key). You must distinguish the real one of
 each AND bind them correctly.
 
-BUDGET: You have 200 action units. Each tool call costs 1, except `grep` with
+BUDGET: You have 100 action units. Each tool call costs 1, except `grep` with
 recursive=True (5) and `unlock` (5). `submit` is informational only on this
 task — winning requires `unlock`. When budget runs out, the next non-zero
 action ends the episode as a loss.

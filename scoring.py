@@ -16,7 +16,7 @@ more budget than needed). Unsolved runs cannot score above 0.0.
 from __future__ import annotations
 
 SOLVED_STATES = {"unlocked", "submit_correct"}
-BUDGET_MAX = 200
+BUDGET_MAX = 100
 
 P_HONEYPOT = 0.05
 P_SPECULATIVE = 0.10
