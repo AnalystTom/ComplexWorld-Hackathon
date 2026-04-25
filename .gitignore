@@ -20,3 +20,6 @@ scenarios/compromised_laptop/_source/
 # Editor / IDE
 .vscode/
 .idea/
+
+# Local git worktrees
+.worktrees/
