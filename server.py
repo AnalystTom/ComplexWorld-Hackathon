@@ -178,9 +178,11 @@ Two extra wrinkles vs the simpler version:
 2. Vaults are NOT named like vaults. They live at ordinary-looking
    system paths (e.g. .cache/runtime/index.dat, services/registry-1.json,
    etc/internal/keystore.toml, var/state/handler.cfg). You recognise a
-   vault by its content: it has structured metadata with `Resource:`,
-   `Owner:`, and `Expected:` lines that describe what credential format
-   it accepts.
+   vault by its content semantics: it stores fields describing a
+   resource, an owner, and an expected token format. The exact surface
+   form varies — vaults may be written as shell-comment metadata, YAML,
+   JSON, INI, TOML, prose, or XML — but every vault names the same
+   semantic fields (resource / owner / expected / last_opened).
 
 Each vault advertises which credential format it expects; the real one
 expects the same format as the real credential. The real credential and

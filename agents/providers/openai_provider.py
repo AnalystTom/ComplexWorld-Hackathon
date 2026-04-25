@@ -33,6 +33,7 @@ class OpenAICompatibleProvider(Provider):
         max_completion_tokens: int = 2048,
         temperature: float | None = None,
         extra_headers: dict[str, str] | None = None,
+        reasoning_effort: str | None = None,
     ):
         api_key = os.environ.get(api_key_env_var)
         if not api_key:
@@ -47,6 +48,7 @@ class OpenAICompatibleProvider(Provider):
         self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.tools = to_openai()
         self._extra_headers = extra_headers or {}
+        self._reasoning_effort = reasoning_effort
         self._messages: list[dict[str, Any]] = []
         self._pending_tool_calls: list[Any] = []
         self._active_call_id: str | None = None
@@ -100,8 +102,19 @@ class OpenAICompatibleProvider(Provider):
         }
         if self._explicit_temp:
             kwargs["temperature"] = self.temperature
+        if self._reasoning_effort:
+            kwargs["reasoning_effort"] = self._reasoning_effort
         if self._extra_headers:
             kwargs["extra_headers"] = self._extra_headers
+        # Per-model API quirks:
+        # - o-series rejects parallel_tool_calls in chat completions.
+        # - gpt-5.x rejects reasoning_effort when tools are present (requires
+        #   the Responses API instead). Drop it; the model still reasons
+        #   internally, just at default effort.
+        if self.model_id.startswith(("o1", "o3", "o4", "o5")):
+            kwargs.pop("parallel_tool_calls", None)
+        if self.model_id.startswith("gpt-5"):
+            kwargs.pop("reasoning_effort", None)
         response = self.client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         msg = choice.message
@@ -155,20 +168,40 @@ _OPENROUTER_HEADERS = {
 
 
 class GPT54Provider(OpenAICompatibleProvider):
-    """OpenAI GPT model. Defaults to gpt-5.4 unless GPT_MODEL_ID is set."""
+    """OpenAI model. Defaults to gpt-5.4; override via GPT_MODEL_ID.
+
+    O-series ids (o1/o3/o4-mini/o5) auto-bump max_completion_tokens to 16384
+    and set reasoning_effort to REASONING_EFFORT (default: high).
+    """
 
     def __init__(self, **kwargs: Any):
         model_id = os.environ.get("GPT_MODEL_ID", "gpt-5.4")
-        super().__init__(
-            # Use the actual model id as the label so OR rollouts and local
-            # logs distinguish gpt-5.4 / gpt-5.5 / gpt-4o etc when running
-            # the same harness with different GPT_MODEL_ID overrides.
-            name=model_id,
-            model_id=model_id,
-            api_key_env_var="OPENAI_API_KEY",
-            base_url=None,
-            **kwargs,
-        )
+        is_o_series = model_id.startswith(("o1", "o3", "o4", "o5"))
+        is_gpt5_reasoning = model_id.startswith("gpt-5")
+        defaults = {
+            "name": model_id,
+            "model_id": model_id,
+            "api_key_env_var": "OPENAI_API_KEY",
+            "base_url": None,
+        }
+        # Reasoning models burn output budget on hidden CoT before producing
+        # the tool call. Default 2048 leaves no room. Bump for both families.
+        if is_o_series:
+            defaults["max_completion_tokens"] = int(
+                os.environ.get("MAX_COMPLETION_TOKENS", "131072")  # ~128K
+            )
+            defaults["reasoning_effort"] = os.environ.get(
+                "REASONING_EFFORT", "high"
+            )
+        elif is_gpt5_reasoning:
+            defaults["max_completion_tokens"] = int(
+                os.environ.get("MAX_COMPLETION_TOKENS", "65536")  # 64K
+            )
+            re_env = os.environ.get("REASONING_EFFORT")
+            if re_env:
+                defaults["reasoning_effort"] = re_env
+        defaults.update(kwargs)
+        super().__init__(**defaults)
 
 
 class HaikuProvider(OpenAICompatibleProvider):
