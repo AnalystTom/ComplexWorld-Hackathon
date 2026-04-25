@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>DeceptionBench — 4-slide deck</title>
+<style>
+  :root {
+    --ink: #000;
+    --paper: #fff;
+    --rule: #000;
+    --muted: #555;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", "Source Serif Pro", Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+  body { font-family: var(--sans); font-size: 17px; line-height: 1.5; }
+  .slide {
+    width: 100%;
+    min-height: 100vh;
+    padding: 8vh 9vw;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    page-break-after: always;
+  }
+  .slide:last-child { border-bottom: 0; }
+  .slide-num {
+    position: absolute;
+    top: 4vh;
+    right: 6vw;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .slide { position: relative; }
+  h1 {
+    font-family: var(--serif);
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 700;
+    margin: 0 0 8px;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+  }
+  h2 {
+    font-family: var(--serif);
+    font-size: clamp(28px, 3.4vw, 38px);
+    font-weight: 700;
+    margin: 0 0 24px;
+    letter-spacing: -0.015em;
+    line-height: 1.15;
+  }
+  h2 + .lede { margin-top: -16px; }
+  .lede {
+    font-family: var(--serif);
+    font-size: clamp(18px, 1.6vw, 22px);
+    color: var(--muted);
+    margin: 0 0 36px;
+    font-style: italic;
+  }
+  .rule {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 28px 0;
+  }
+  ul { margin: 0 0 18px; padding: 0 0 0 22px; }
+  li { margin: 8px 0; }
+  li strong { font-weight: 700; }
+  code, .mono { font-family: var(--mono); font-size: 0.9em; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 48px;
+    margin: 0 0 18px;
+  }
+  .col h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin: 0 0 8px;
+    font-weight: 700;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 15px;
+    margin: 8px 0 16px;
+  }
+  th, td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--ink);
+    font-family: var(--mono);
+  }
+  th {
+    border-top: 2px solid var(--ink);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    background: var(--paper);
+  }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.bold { font-weight: 700; }
+  .pull {
+    font-family: var(--serif);
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.35;
+    border-left: 2px solid var(--ink);
+    padding: 4px 0 4px 18px;
+    margin: 24px 0;
+    font-style: italic;
+  }
+  footer {
+    margin-top: auto;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  @media print {
+    body { font-size: 14px; }
+    .slide { min-height: auto; padding: 32mm 28mm; }
+  }
+</style>
+</head>
+<body>
+
+<section class="slide">
+  <div class="slide-num">01 / 04</div>
+  <h1>DeceptionBench</h1>
+  <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
+
+  <hr class="rule">
+
+  <ul>
+    <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
+    <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
+    <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
+  </ul>
+
+  <p class="pull">"It costs more LLM capability to detect a planted decoy than it cost to plant it — and we've measured the gap."</p>
+
+  <footer>
+    <span>DeceptionBench &middot; v3</span>
+    <span>OpenReward &middot; atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">02 / 04</div>
+  <h2>Environment design</h2>
+  <p class="lede">A simulated dev laptop populated by an OSS repo + LLM-authored decoys.</p>
+
+  <div class="grid">
+    <div class="col">
+      <h3>The world</h3>
+      <ul>
+        <li><strong>138 files / 39 directories</strong> under <code>/home/dev/</code>.</li>
+        <li>Real source: <code>getsentry/self-hosted</code> ingested verbatim.</li>
+        <li>Plus synth dotfiles &amp; notes for "personal laptop" texture.</li>
+        <li>Per-task overlays plant the real credential and decoys.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>Tools (six)</h3>
+      <ul>
+        <li><code>ls / cat / find / grep / stat</code> — read-only.</li>
+        <li><code>unlock(target, key)</code> — terminal on success.</li>
+        <li><code>submit</code> — informational on v1+ tasks.</li>
+        <li>Costs: 1 each, 5 for recursive grep &amp; unlock.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>Win condition</h3>
+      <ul>
+        <li>Bind <strong>real credential</strong> &times; <strong>real vault</strong>.</li>
+        <li>Substring match on the credential string.</li>
+        <li>One winning combination out of 660+.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>Decoy generation</h3>
+      <ul>
+        <li>Phase A: Gemini 3 Flash plants honeypots &amp; decoy vault metadata.</li>
+        <li>Validators reject disclaimer language &amp; real-anchor leaks.</li>
+        <li>Deceiver never sees which path is real.</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Environment</span>
+    <span>OpenReward env: 6 tools, action-budget</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">03 / 04</div>
+  <h2>Methodology</h2>
+  <p class="lede">Difficulty is dialed across four orthogonal axes.</p>
+
+  <div class="grid">
+    <div class="col">
+      <h3>Variant ladder</h3>
+      <ul>
+        <li><strong>v0.</strong> Find AKIA, submit. Pure retrieval.</li>
+        <li><strong>v1.</strong> Find + bind to vault.</li>
+        <li><strong>v2.</strong> Format unknown, cross-reference anchors.</li>
+        <li><strong>v3.</strong> Heterogeneous formats, disguised vaults, hardened decoys.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>v3 difficulty levers</h3>
+      <ul>
+        <li><strong>8 credential formats</strong> — UUID, JWT, AKIA, ghp_, passphrase, hex, prefix-token, base64.</li>
+        <li><strong>7 vault structures</strong> — comment, YAML, JSON, INI, TOML, prose, XML.</li>
+        <li><strong>60 honeypots + 11 disguised vaults</strong> per task.</li>
+        <li><strong>Cross-reference anchor</strong> is the only non-gameable signal.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>What we hold fixed</h3>
+      <ul>
+        <li>Budget = 100 (v3) or 200 (final).</li>
+        <li>Same Deceiver model across Searcher comparisons.</li>
+        <li>Cross-seed task variance (3 random seeds, 3 trials each).</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>What we measure</h3>
+      <ul>
+        <li>Reward (binary win/loss).</li>
+        <li>Cost-of-disambiguation: <code>memory_span</code>, steps, bites.</li>
+        <li>Reasoning depth: <code>reasoning_tokens_total</code>, per-turn usage.</li>
+        <li>Binding errors: typed (<em>wrong key</em> vs <em>wrong target</em>).</li>
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <span>Methodology</span>
+    <span>Wilson 60% CI &middot; bootstrap-friendly metadata</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">04 / 04</div>
+  <h2>Headline results &mdash; v3</h2>
+  <p class="lede">All four reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Model</th>
+        <th class="num">Wins / N</th>
+        <th class="num">Mean steps</th>
+        <th class="num">Mean reasoning tokens</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="bold">gpt-5.5</td>
+        <td class="num bold">13 / 13</td>
+        <td class="num">~21</td>
+        <td class="num">~3,000</td>
+        <td>Most efficient by a wide margin.</td>
+      </tr>
+      <tr>
+        <td class="bold">gpt-5</td>
+        <td class="num">8 / 8</td>
+        <td class="num">~25</td>
+        <td class="num">~21,000</td>
+        <td>Wins, but ~7&times; gpt-5.5's spend.</td>
+      </tr>
+      <tr>
+        <td class="bold">o4-mini-high</td>
+        <td class="num">8 / 8</td>
+        <td class="num">~29</td>
+        <td class="num">~30,000</td>
+        <td>Wins consistently, heavy thinker.</td>
+      </tr>
+      <tr>
+        <td class="bold">o3-high</td>
+        <td class="num">7 / 11</td>
+        <td class="num">~46</td>
+        <td class="num">~26,000</td>
+        <td><strong>Only model with task losses</strong> (4 budget-exhausted).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <ul>
+    <li><strong>Reasoning depth does not predict success on this benchmark.</strong> The cheapest reasoner (gpt-5.5) wins fastest; the most expensive (o3) is the only one to fail.</li>
+    <li><strong>Context-window saturation is not the bottleneck.</strong> Peak utilisation ~5&percnt; of gpt-5.4's 922K window. The constraint is <em>attention discrimination across in-context distractors</em>.</li>
+    <li><strong>Variance is in <em>how</em>, not <em>whether</em>.</strong> gpt-5.5 reasons internally and acts decisively; o3 reads exhaustively and runs out of compute.</li>
+  </ul>
+
+  <footer>
+    <span>Results &middot; 36 trials &middot; 3 seeds</span>
+    <span>openreward.ai/atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
+</body>
+</html>
