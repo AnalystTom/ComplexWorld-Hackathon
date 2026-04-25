@@ -109,8 +109,8 @@
   td.bold { font-weight: 700; }
   .charts {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 28px 28px;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px 36px;
     margin: 0 0 20px;
   }
   .chart-title {
@@ -395,7 +395,45 @@
 
 <section class="slide">
   <div class="slide-num">06 / 12</div>
-  <h2>Headline results &mdash; charts</h2>
+  <h2>Repo at a glance</h2>
+  <p class="lede">Every piece of the benchmark, where it lives.</p>
+
+  <pre class="tree">ComplexWorld-Hackathon/
+├── <b>server.py</b>                     <em>OpenReward env (Phase B runtime)</em>
+├── <b>build_tasks.py</b>                <em>Phase A — Deceiver pipeline + task generator</em>
+├── docs/brief.md                 <em>canonical spec</em>
+├── scenarios/
+│   ├── build_base_tree.py        <em>OSS repo → base_tree.json (138 files)</em>
+│   └── compromised_laptop/
+│       ├── base_tree.json        <em>simulated /home/dev world</em>
+│       ├── candidate_locations*  <em>8 secret-planting templates</em>
+│       ├── allowed_honeypot_*    <em>60+ honeypot paths</em>
+│       ├── vault_locations_v3.   <em>20 disguised vault paths</em>
+│       └── anchor_pool.json      <em>83 cross-reference resource names</em>
+├── tasks/                        <em>generated task specs (smoke / v1 / v2 / v3)</em>
+├── <b>agents/</b>
+│   ├── harness.py                <em>Searcher loop + JSON logger + OR mirror</em>
+│   ├── run.py                    <em>CLI entry point</em>
+│   ├── tool_schema.py            <em>canonical 7-tool schema</em>
+│   ├── providers/openai_provider <em>gpt-5.x, o-series, OpenRouter via OpenAI SDK</em>
+│   └── baselines/                <em>random + exhaustive (no API)</em>
+├── tests/                        <em>39 tests: env, validators, determinism, unlock</em>
+├── scripts/
+│   ├── export_results.py         <em>walk runs/ → exports/v3-rollouts.jsonl + .csv</em>
+│   ├── export_final.py           <em>filter to seeds 527/649/728 final tier</em>
+│   └── analyze_trace.py          <em>per-rollout diagnostic</em>
+├── <b>exports/</b>                       <em>deck (HTML), JSONL/CSV for charting</em>
+└── runs/                         <em>per-session logs (timestamped JSON)</em></pre>
+
+  <footer>
+    <span>Repo tree</span>
+    <span>github.com/AnalystTom/ComplexWorld-Hackathon</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">07 / 12</div>
+  <h2>Headline results &mdash; capability charts</h2>
   <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>.</p>
 
   <div class="charts">
@@ -540,7 +578,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">07 / 12</div>
+  <div class="slide-num">08 / 12</div>
   <h2>Headline results &mdash; cost charts</h2>
   <p class="lede">Process quality &amp; cost: bites, unlock attempts, budget used.</p>
 
@@ -672,7 +710,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">08 / 12</div>
+  <div class="slide-num">09 / 12</div>
   <h2>Pareto frontier</h2>
   <p class="lede">Cost-of-solving in 2D &mdash; reasoning tokens &times; action steps. Lower-left dominates.</p>
 
@@ -772,7 +810,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">09 / 12</div>
+  <div class="slide-num">10 / 12</div>
   <h2>Headline results &mdash; data &amp; takeaways</h2>
   <p class="lede">Five reasoning models on v3 across 3 seeds; gpt-5.4 sample is 30 trials wide.</p>
 
@@ -840,44 +878,6 @@
   <footer>
     <span>Results &middot; data &middot; 3 seeds</span>
     <span>openreward.ai/atman/DeceptionSearch-v0</span>
-  </footer>
-</section>
-
-<section class="slide">
-  <div class="slide-num">10 / 12</div>
-  <h2>Repo at a glance</h2>
-  <p class="lede">Every piece of the benchmark, where it lives.</p>
-
-  <pre class="tree">ComplexWorld-Hackathon/
-├── <b>server.py</b>                     <em>OpenReward env (Phase B runtime)</em>
-├── <b>build_tasks.py</b>                <em>Phase A — Deceiver pipeline + task generator</em>
-├── docs/brief.md                 <em>canonical spec</em>
-├── scenarios/
-│   ├── build_base_tree.py        <em>OSS repo → base_tree.json (138 files)</em>
-│   └── compromised_laptop/
-│       ├── base_tree.json        <em>simulated /home/dev world</em>
-│       ├── candidate_locations*  <em>8 secret-planting templates</em>
-│       ├── allowed_honeypot_*    <em>60+ honeypot paths</em>
-│       ├── vault_locations_v3.   <em>20 disguised vault paths</em>
-│       └── anchor_pool.json      <em>83 cross-reference resource names</em>
-├── tasks/                        <em>generated task specs (smoke / v1 / v2 / v3)</em>
-├── <b>agents/</b>
-│   ├── harness.py                <em>Searcher loop + JSON logger + OR mirror</em>
-│   ├── run.py                    <em>CLI entry point</em>
-│   ├── tool_schema.py            <em>canonical 7-tool schema</em>
-│   ├── providers/openai_provider <em>gpt-5.x, o-series, OpenRouter via OpenAI SDK</em>
-│   └── baselines/                <em>random + exhaustive (no API)</em>
-├── tests/                        <em>39 tests: env, validators, determinism, unlock</em>
-├── scripts/
-│   ├── export_results.py         <em>walk runs/ → exports/v3-rollouts.jsonl + .csv</em>
-│   ├── export_final.py           <em>filter to seeds 527/649/728 final tier</em>
-│   └── analyze_trace.py          <em>per-rollout diagnostic</em>
-├── <b>exports/</b>                       <em>deck (HTML), JSONL/CSV for charting</em>
-└── runs/                         <em>per-session logs (timestamped JSON)</em></pre>
-
-  <footer>
-    <span>Repo tree</span>
-    <span>github.com/AnalystTom/ComplexWorld-Hackathon</span>
   </footer>
 </section>
 
