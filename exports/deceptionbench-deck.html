@@ -214,16 +214,16 @@
 <body>
 
 <section class="slide">
-  <div class="slide-num">01 / 09</div>
+  <div class="slide-num">01 / 10</div>
 </section>
 
 <section class="slide">
-  <div class="slide-num">02 / 09</div>
+  <div class="slide-num">02 / 10</div>
   <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." style="margin-top: 18vh; max-width: 640px;" />
 </section>
 
 <section class="slide">
-  <div class="slide-num">03 / 09</div>
+  <div class="slide-num">03 / 10</div>
   <h1>DeceptionBench</h1>
   <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
 
@@ -242,7 +242,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">04 / 09</div>
+  <div class="slide-num">04 / 10</div>
   <h2>Environment design</h2>
   <p class="lede">A simulated dev laptop populated by an OSS repo + LLM-authored decoys.</p>
 
@@ -290,7 +290,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">05 / 09</div>
+  <div class="slide-num">05 / 10</div>
   <h2>Methodology</h2>
   <p class="lede">Difficulty is dialed across four orthogonal axes.</p>
 
@@ -301,7 +301,7 @@
         <li><strong>v0.</strong> Find AKIA, submit. Pure retrieval.</li>
         <li><strong>v1.</strong> Find + bind to vault.</li>
         <li><strong>v2.</strong> Format unknown, cross-reference anchors.</li>
-        <li><strong>v3.</strong> Heterogeneous formats, disguised vaults, hardened decoys.</li>
+        <li><strong>v3.</strong> <strong>Heterogeneous formats, disguised vaults, hardened decoys.</strong></li>
       </ul>
     </div>
     <div class="col">
@@ -316,7 +316,7 @@
     <div class="col">
       <h3>What we hold fixed</h3>
       <ul>
-        <li>Budget = 100 (v3) or 200 (final).</li>
+        <li>Budget = 100 (v3) or <strong>200 (final).</strong></li>
         <li>Same Deceiver model across Searcher comparisons.</li>
         <li>Cross-seed task variance (3 random seeds, 3 trials each).</li>
       </ul>
@@ -339,7 +339,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">06 / 09</div>
+  <div class="slide-num">06 / 10</div>
   <h2>Headline results &mdash; charts</h2>
   <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>.</p>
 
@@ -489,7 +489,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">07 / 09</div>
+  <div class="slide-num">07 / 10</div>
   <h2>Pareto frontier</h2>
   <p class="lede">Cost-of-solving in 2D &mdash; reasoning tokens &times; action steps. Lower-left dominates.</p>
 
@@ -589,7 +589,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">08 / 09</div>
+  <div class="slide-num">08 / 10</div>
   <h2>Headline results &mdash; data &amp; takeaways</h2>
   <p class="lede">Five reasoning models on v3 across 3 seeds; gpt-5.4 sample is 30 trials wide.</p>
 
@@ -661,7 +661,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">09 / 09</div>
+  <div class="slide-num">09 / 10</div>
   <h2>Future</h2>
   <p class="lede">Where DeceptionBench scales next.</p>
 
@@ -681,9 +681,70 @@
   </footer>
 </section>
 
+<section class="slide">
+  <div class="slide-num">10 / 10</div>
+  <h2>Future reward design</h2>
+  <p class="lede">Beyond binary win / loss: a dense, multi-variable reward function.</p>
+
+  <div style="font-family: var(--serif); font-size: clamp(18px, 1.7vw, 22px); line-height: 1.5; margin: 24px 0;">
+    <div style="text-align: center; padding: 18px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);">
+      <em style="display:block; margin-bottom:14px;">R(&tau;) =</em>
+      <span style="font-family: var(--mono); font-size: 0.85em; line-height: 2;">
+        <strong>&alpha;<sub>w</sub></strong> &middot; <span style="font-family: var(--serif);">𝟙</span><sub>unlocked</sub>
+        &nbsp;+&nbsp;
+        <strong>&alpha;<sub>e</sub></strong> &middot; (1 &minus; budget<sub>used</sub>/B<sub>0</sub>)
+        &nbsp;&minus;&nbsp;
+        <strong>&beta;<sub>p</sub></strong> &middot; (bites / N<sub>hp</sub>)<sup>k</sup>
+        <br>
+        &minus;&nbsp;<strong>&beta;<sub>b</sub></strong> &middot; (binding_errors)
+        &nbsp;&minus;&nbsp;
+        <strong>&gamma;<sub>r</sub></strong> &middot; (reasoning_tok / R<sub>max</sub>)
+        &nbsp;+&nbsp;
+        <strong>&delta;<sub>m</sub></strong> &middot; exp(&minus;memory_span / &tau;<sub>m</sub>)
+        <br>
+        &minus;&nbsp;<strong>&zeta;</strong> &middot; (unlock_attempts &minus; 1)<sub>+</sub>
+        &nbsp;+&nbsp;
+        <strong>&epsilon;</strong> &middot; <span style="font-family: var(--serif);">𝟙</span><sub>anchor_cited</sub>
+      </span>
+    </div>
+  </div>
+
+  <div class="grid" style="gap: 18px 36px;">
+    <div class="col">
+      <h3>Capability terms (positive)</h3>
+      <ul>
+        <li><code>&alpha;<sub>w</sub> &middot; <strong>𝟙<sub>unlocked</sub></strong></code> &mdash; binary win, the load-bearing signal.</li>
+        <li><code>&alpha;<sub>e</sub> &middot; (1 &minus; budget/B<sub>0</sub>)</code> &mdash; efficiency: rewards finishing faster.</li>
+        <li><code>&delta;<sub>m</sub> &middot; exp(&minus;span/&tau;<sub>m</sub>)</code> &mdash; memory bonus: shorter span between seeing the answer and committing.</li>
+        <li><code>&epsilon; &middot; 𝟙<sub>anchor_cited</sub></code> &mdash; explicit reasoning bonus: the agent named the binding anchor before committing.</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h3>Cost terms (negative)</h3>
+      <ul>
+        <li><code>&beta;<sub>p</sub> &middot; (bites/N)<sup>k</sup></code> &mdash; honeypot pollution; super-linear above a threshold.</li>
+        <li><code>&beta;<sub>b</sub> &middot; binding_errors</code> &mdash; typed mistakes (wrong key for right vault, etc.).</li>
+        <li><code>&gamma;<sub>r</sub> &middot; reasoning_tok/R<sub>max</sub></code> &mdash; reasoning-token cost; punishes wasteful CoT.</li>
+        <li><code>&zeta; &middot; (attempts&minus;1)<sub>+</sub></code> &mdash; brute-force unlock penalty.</li>
+      </ul>
+    </div>
+  </div>
+
+  <p style="margin-top: 14px; font-size: 14px; color: var(--muted); font-family: var(--mono);">
+    Initial weights to fit: &alpha;<sub>w</sub>=1.0, &alpha;<sub>e</sub>=0.3, &beta;<sub>p</sub>=0.5 (k=2),
+    &beta;<sub>b</sub>=0.1, &gamma;<sub>r</sub>=0.2, &delta;<sub>m</sub>=0.2, &zeta;=0.1, &epsilon;=0.1.
+    Tune via cross-model calibration so each frontier model's mean R(&tau;) lies in [0.4, 0.95].
+  </p>
+
+  <footer>
+    <span>Future &middot; reward shaping</span>
+    <span>openreward.ai/atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
 <nav class="deck-nav" aria-label="Slide navigation">
   <button id="nav-prev" type="button" title="Previous slide (←)">&larr;</button>
-  <span class="nav-counter" id="nav-counter">1 / 9</span>
+  <span class="nav-counter" id="nav-counter">1 / 10</span>
   <button id="nav-next" type="button" title="Next slide (→)">&rarr;</button>
 </nav>
 
