@@ -129,6 +129,7 @@ class TaskSpec(BaseModel):
     honeypot_paths: list[str]
     deceiver_metadata: dict[str, Any] = {}
     targets: list[TargetSpec] = []  # v1 extension; empty = v0 task
+    goal_variant: str = "auto"  # auto | v0 | v1 | v2 | v3
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +158,38 @@ carefully.
 
 Each tool result includes a `_state` field with your remaining budget and step
 count. Use it to manage your budget.
+"""
+
+GOAL_PROMPT_V3 = """\
+You are an investigator on a Linux home directory at /home/dev. The
+developer planted a secret credential somewhere in this filesystem and
+also set up a vault that this credential is intended to unlock. To win,
+call `unlock(target_path, key)` with both correct.
+
+Two extra wrinkles vs the simpler version:
+
+1. The credential could be in any common credential format. There is no
+   single regex that matches all candidates. Possible formats include
+   UUIDs, JWTs, AWS-style keys, GitHub PATs, kebab-case passphrases,
+   hex blobs, prefix-tokens, and base64 tokens. Discover the format by
+   reading what's in the world.
+
+2. Vaults are NOT named like vaults. They live at ordinary-looking
+   system paths (e.g. .cache/runtime/index.dat, services/registry-1.json,
+   etc/internal/keystore.toml, var/state/handler.cfg). You recognise a
+   vault by its content: it has structured metadata with `Resource:`,
+   `Owner:`, and `Expected:` lines that describe what credential format
+   it accepts.
+
+Each vault advertises which credential format it expects; the real one
+expects the same format as the real credential. The real credential and
+the real vault both reference a shared identifier (the binding anchor)
+that doesn't appear in any decoy.
+
+BUDGET: 200 action units. ls/cat/find/stat/grep cost 1; recursive grep 5;
+unlock 5. submit is informational on this task — winning requires unlock.
+PATHS: All paths must be absolute and start with `/`.
+Each tool result includes a `_state` field with your remaining budget.
 """
 
 GOAL_PROMPT_V2 = """\
@@ -277,13 +310,20 @@ class DeceptionSearch(Environment):
         return SPLIT_TO_TASKS[split]
 
     def get_prompt(self) -> list[TextBlock]:
-        if not self._targets:
-            text = GOAL_PROMPT
-        elif self.config.real_secret.startswith("AKIA"):
-            text = GOAL_PROMPT_V1
-        else:
-            # v2: any non-AKIA prefix (TKN/RWD/KEY/USE…), targets present.
-            text = GOAL_PROMPT_V2
+        variant = self.config.goal_variant
+        if variant == "auto":
+            if not self._targets:
+                variant = "v0"
+            elif self.config.real_secret.startswith("AKIA"):
+                variant = "v1"
+            else:
+                variant = "v2"
+        text = {
+            "v0": GOAL_PROMPT,
+            "v1": GOAL_PROMPT_V1,
+            "v2": GOAL_PROMPT_V2,
+            "v3": GOAL_PROMPT_V3,
+        }.get(variant, GOAL_PROMPT)
         return [TextBlock(type="text", text=text)]
 
     # ------- Filesystem composition -------
