@@ -101,6 +101,17 @@ def run_session(
         if output.finished:
             log["metadata"] = output.metadata
             log["reward"] = output.reward
+            # Pull provider-side per-turn token usage if it has it.
+            turn_usage = getattr(provider, "_turn_usage", None)
+            if turn_usage:
+                log["metadata"] = dict(log["metadata"] or {})
+                log["metadata"]["turn_usage"] = turn_usage
+                log["metadata"]["reasoning_tokens_total"] = getattr(
+                    provider, "_reasoning_tokens_total", 0
+                )
+                log["metadata"]["final_prompt_tokens"] = (
+                    turn_usage[-1].get("prompt_tokens") if turn_usage else None
+                )
             break
         try:
             tool_name, tool_args = provider.step(result_text)

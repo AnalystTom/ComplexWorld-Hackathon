@@ -35,8 +35,8 @@ from openreward.environments import (
 # Constants
 # ---------------------------------------------------------------------------
 
-BUDGET_INITIAL: int = 100
-STEP_CAP: int = 150  # safety cap; should never fire in practice
+BUDGET_INITIAL: int = 200
+STEP_CAP: int = 300  # safety cap; should never fire in practice
 CAT_CHUNK_SIZE: int = 4096
 FIND_MATCH_CAP: int = 100
 GREP_MATCH_CAP: int = 100
@@ -142,7 +142,7 @@ GOAL: Find a string matching the regex AKIA[A-Z0-9]{16} (the literal characters
 "AKIA" followed by exactly 16 uppercase alphanumeric characters). Submit it via
 the `submit` tool to end the episode.
 
-BUDGET: You have 100 action units. Each tool call costs 1 unit, except `grep`
+BUDGET: You have 200 action units. Each tool call costs 1 unit, except `grep`
 with recursive=True which costs 5 units. `submit` is free. When budget reaches
 0, the next non-zero-cost action ends the episode as a loss.
 
@@ -173,7 +173,7 @@ exactly one of each is real. The two are linked by a shared identifier
 that appears in both the real credential's surrounding context and the
 real vault's metadata.
 
-BUDGET: 100 action units. Each tool call costs 1, except `grep` with
+BUDGET: 200 action units. Each tool call costs 1, except `grep` with
 recursive=True (5) and `unlock` (5). `submit` is informational on this
 task — winning requires `unlock`.
 
@@ -195,7 +195,7 @@ locations) and DECOY vaults (files that look like vaults but won't unlock,
 or won't unlock with the right key). You must distinguish the real one of
 each AND bind them correctly.
 
-BUDGET: You have 100 action units. Each tool call costs 1, except `grep` with
+BUDGET: You have 200 action units. Each tool call costs 1, except `grep` with
 recursive=True (5) and `unlock` (5). `submit` is informational only on this
 task — winning requires `unlock`. When budget runs out, the next non-zero
 action ends the episode as a loss.
