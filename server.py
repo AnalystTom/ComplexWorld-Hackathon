@@ -534,7 +534,7 @@ class DeceptionSearch(Environment):
             return self._format_response(
                 {"error": f"No vault at {params.target_path}", "unlocked": False}
             )
-        key_correct = params.key.strip() == target.expected_key
+        key_correct = target.expected_key in params.key
         target_correct = target.real
         if key_correct and target_correct:
             self._t_unlocked = self._step_count
