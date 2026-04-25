@@ -117,6 +117,30 @@ TOOLS: list[dict[str, Any]] = [
             "required": ["answer"],
         },
     },
+    {
+        "name": "unlock",
+        "description": (
+            "Try to unlock a vault target with a key. Cost: 5. Terminal on "
+            "success. Wrong attempts are non-terminal but still cost 5, so "
+            "commit thoughtfully. Wins iff the target is the real one AND "
+            "the expected key is contained in `key`. Failure messages do "
+            "not reveal which dimension was wrong."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "target_path": {
+                    "type": "string",
+                    "description": "Absolute path of the vault to unlock.",
+                },
+                "key": {
+                    "type": "string",
+                    "description": "Candidate key string (must contain the expected_key as a substring).",
+                },
+            },
+            "required": ["target_path", "key"],
+        },
+    },
 ]
 
 TOOL_NAMES: list[str] = [t["name"] for t in TOOLS]

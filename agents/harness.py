@@ -32,6 +32,7 @@ def _import_env() -> tuple[Any, dict[str, Any]]:
         "grep": srv.GrepParams,
         "stat": srv.StatParams,
         "submit": srv.SubmitParams,
+        "unlock": srv.UnlockParams,
     }
     return srv.DeceptionSearch, params
 
