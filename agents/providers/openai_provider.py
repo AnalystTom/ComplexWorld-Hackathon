@@ -106,7 +106,8 @@ class OpenAICompatibleProvider(Provider):
         choice = response.choices[0]
         msg = choice.message
         # Capture token usage for memory/context analysis.
-        usage = response.usage
+        # Defensive getattr — test fakes may not have .usage attached.
+        usage = getattr(response, "usage", None)
         if usage is not None:
             ct_details = getattr(usage, "completion_tokens_details", None)
             pt_details = getattr(usage, "prompt_tokens_details", None)
