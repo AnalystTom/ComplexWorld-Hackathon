@@ -37,6 +37,13 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel
 
+# Load .env if present; non-overwriting.
+try:
+    from agents import _dotenv
+    _dotenv.load()
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------

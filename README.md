@@ -20,7 +20,20 @@ git clone --depth 1 https://github.com/getsentry/self-hosted \
 
 # 3. Build the base tree (real Sentry self-hosted + synthesised home dir)
 python scenarios/build_base_tree.py
+
+# 4. API keys (gitignored, auto-loaded by build_tasks.py and agents/run.py)
+cp .env.example .env
+$EDITOR .env
 ```
+
+Required keys (`.env` or shell):
+
+| Var | Used by | Where to get |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Haiku 4.5 Searcher | https://console.anthropic.com/settings/keys |
+| `OPENAI_API_KEY` | GPT-5.4 Searcher | https://platform.openai.com/api-keys |
+| `GEMINI_API_KEY` | Gemini 3 Flash Deceiver | https://aistudio.google.com/app/apikey |
+| `OPENREWARD_API_KEY` | `orwd` CLI publish | https://openreward.ai/settings |
 
 ## Generate task specs
 
@@ -61,6 +74,35 @@ Per-session logs land at `runs/<run_id>.json`.
 ```bash
 python -m pytest tests/ -v
 ```
+
+## Publish to OpenReward
+
+The env is registered as **`atman/DeceptionSearch-v0`** at
+https://openreward.ai/atman/DeceptionSearch-v0.
+
+```bash
+# Confirm auth
+orwd whoami
+
+# Register the env (one-time)
+orwd create DeceptionSearch-v0 \
+  --namespace atman \
+  --description "Find a hidden AWS access key in a simulated dev laptop populated with LLM-generated decoys."
+
+# Wire to this GitHub repo (auto-deploys on push)
+orwd link atman/DeceptionSearch-v0 AnalystTom/ComplexWorld-Hackathon
+
+# Upload the world + task specs to the env's file store (mounted at /orwd_data)
+orwd upload atman/DeceptionSearch-v0 \
+  scenarios/compromised_laptop/base_tree.json \
+  tasks/smoke.json \
+  tasks/dev.json \
+  tasks/test.json
+```
+
+After link + upload, hosted runs invoke the env at
+`https://openreward.ai/atman/DeceptionSearch-v0`. The env class identifies
+itself with `name() == "DeceptionSearch-v0"` (see `server.py`).
 
 ## Layout
 

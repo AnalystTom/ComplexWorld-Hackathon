@@ -152,6 +152,11 @@ count. Use it to manage your budget.
 class DeceptionSearch(Environment):
     """Find a hidden AWS access key in a filesystem populated with decoys."""
 
+    @classmethod
+    def name(cls) -> str:
+        # Registered as openreward.ai/atman/DeceptionSearch-v0
+        return "DeceptionSearch-v0"
+
     def __init__(
         self,
         task_spec: JSONObject = {},  # noqa: B006 - ORS interface
