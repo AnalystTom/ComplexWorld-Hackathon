@@ -122,6 +122,33 @@ def run_session(
             break
         if rollout is not None:
             provider.flush_assistants(rollout)
+    else:
+        # The for-loop completed without breaking — we hit max_turns without
+        # the env ever returning finished=True (typical when an agent loops
+        # on a non-terminal tool like submit-advisory). Mark the rollout as
+        # complete so it doesn't dangle on OR with no terminal event.
+        if log["metadata"] is None:
+            log["reward"] = 0.0
+            log["metadata"] = {
+                "terminal_state": "harness_max_turns",
+                "max_turns": max_turns,
+                "note": "Harness gave up after max_turns without env termination.",
+            }
+        if rollout is not None:
+            call_id = provider.last_call_id()
+            if call_id is not None:
+                rollout.log_openai_completions(
+                    {
+                        "role": "tool",
+                        "tool_call_id": call_id,
+                        "content": (
+                            "Harness hit max_turns without env termination. "
+                            "Rollout abandoned."
+                        ),
+                    },
+                    reward=0.0,
+                    is_finished=True,
+                )
 
     if log_dir is not None:
         log_dir.mkdir(parents=True, exist_ok=True)

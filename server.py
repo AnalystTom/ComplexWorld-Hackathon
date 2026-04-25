@@ -44,6 +44,7 @@ GREP_LINE_TRUNC: int = 500
 SUBMIT_LEN_CAP: int = 500
 COST_GREP_RECURSIVE: int = 5
 COST_UNLOCK: int = 5
+MAX_SUBMIT_ON_V1PLUS: int = 3  # advisory-loop guard for v1+ tasks
 DEFAULT_MTIME: int = 1700000000
 DEFAULT_FILE_MODE: str = "rw-------"
 DEFAULT_DIR_MODE: str = "rwxr-xr-x"
@@ -457,12 +458,28 @@ class DeceptionSearch(Environment):
         self._step_count += 1
         self._tool_counts["submit"] += 1
         if self._targets:
+            # Advisory non-terminal for the first MAX_SUBMIT_ON_V1PLUS calls
+            # so an agent can self-correct toward unlock(); after that we
+            # terminate as a loss to prevent the budget-exhausted submit-spam
+            # loop (each advisory costs 0; without a cap the agent never exits).
+            if self._tool_counts["submit"] > MAX_SUBMIT_ON_V1PLUS:
+                return self._terminate(
+                    reward=0.0,
+                    terminal_state="submit_advisory_loop",
+                    message=(
+                        f"submit was called {self._tool_counts['submit']} times "
+                        f"on a task that requires unlock(). Episode ended."
+                    ),
+                )
             return self._format_response({
                 "advisory": (
                     "This task requires unlocking a vault, not submitting a "
                     "key. Use unlock(target_path, key) on the correct vault."
                 ),
                 "terminal": False,
+                "submit_attempts_remaining": (
+                    MAX_SUBMIT_ON_V1PLUS - self._tool_counts["submit"]
+                ),
             })
         win = (
             len(params.answer) <= SUBMIT_LEN_CAP

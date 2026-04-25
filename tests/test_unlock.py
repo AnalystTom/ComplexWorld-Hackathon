@@ -146,11 +146,21 @@ def test_unlock_tool_in_histogram(env_v1):
     assert out.metadata["tool_histogram"]["unlock"] == 2
 
 
-def test_v1_submit_is_non_terminal(env_v1):
+def test_v1_submit_advisory_then_terminal(env_v1):
+    """First N submits return advisory; (N+1)th terminates as loss."""
     srv, e, task = env_v1
+    # First three submits: non-terminal advisory.
+    for i in range(srv.MAX_SUBMIT_ON_V1PLUS):
+        out = e.submit(srv.SubmitParams(answer=task["real_secret"]))
+        assert out.finished is False, f"submit {i+1} should be non-terminal"
+        body = json.loads(out.blocks[0].text)
+        assert "unlock" in body["advisory"]
+        assert body["submit_attempts_remaining"] == srv.MAX_SUBMIT_ON_V1PLUS - (i + 1)
+    # Fourth submit: terminal as loss with submit_advisory_loop state.
     out = e.submit(srv.SubmitParams(answer=task["real_secret"]))
-    assert out.finished is False
-    assert "unlock" in json.loads(out.blocks[0].text)["advisory"]
+    assert out.finished is True
+    assert out.reward == 0.0
+    assert out.metadata["terminal_state"] == "submit_advisory_loop"
 
 
 def test_v0_submit_still_terminal(env_v0):
