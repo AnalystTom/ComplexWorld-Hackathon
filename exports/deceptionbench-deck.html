@@ -214,16 +214,16 @@
 <body>
 
 <section class="slide">
-  <div class="slide-num">01 / 06</div>
+  <div class="slide-num">01 / 09</div>
 </section>
 
 <section class="slide">
-  <div class="slide-num">02 / 06</div>
+  <div class="slide-num">02 / 09</div>
   <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." style="margin-top: 18vh; max-width: 640px;" />
 </section>
 
 <section class="slide">
-  <div class="slide-num">03 / 06</div>
+  <div class="slide-num">03 / 09</div>
   <h1>DeceptionBench</h1>
   <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
 
@@ -242,7 +242,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">04 / 06</div>
+  <div class="slide-num">04 / 09</div>
   <h2>Environment design</h2>
   <p class="lede">A simulated dev laptop populated by an OSS repo + LLM-authored decoys.</p>
 
@@ -290,7 +290,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">05 / 06</div>
+  <div class="slide-num">05 / 09</div>
   <h2>Methodology</h2>
   <p class="lede">Difficulty is dialed across four orthogonal axes.</p>
 
@@ -339,7 +339,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">06 / 07</div>
+  <div class="slide-num">06 / 09</div>
   <h2>Headline results &mdash; charts</h2>
   <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>.</p>
 
@@ -489,7 +489,107 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">07 / 07</div>
+  <div class="slide-num">07 / 09</div>
+  <h2>Pareto frontier</h2>
+  <p class="lede">Cost-of-solving in 2D &mdash; reasoning tokens &times; action steps. Lower-left dominates.</p>
+
+  <div style="margin: 0 auto; max-width: 760px; width: 100%;">
+    <svg viewBox="0 0 760 460" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; display: block;">
+      <!-- Plot area: x=80..720 (640 wide), y=40..400 (360 tall) -->
+      <!-- X axis: 0..35,000 reasoning tokens; Y axis: 0..50 steps -->
+
+      <!-- Axes -->
+      <line x1="80" y1="400" x2="720" y2="400" stroke="#000" stroke-width="1"/>
+      <line x1="80" y1="40" x2="80" y2="400" stroke="#000" stroke-width="1"/>
+
+      <!-- Y-axis ticks (steps) -->
+      <g font-family="ui-monospace, monospace" font-size="11" fill="#000">
+        <line x1="76" y1="328" x2="80" y2="328" stroke="#000"/><text x="72" y="332" text-anchor="end">10</text>
+        <line x1="76" y1="256" x2="80" y2="256" stroke="#000"/><text x="72" y="260" text-anchor="end">20</text>
+        <line x1="76" y1="184" x2="80" y2="184" stroke="#000"/><text x="72" y="188" text-anchor="end">30</text>
+        <line x1="76" y1="112" x2="80" y2="112" stroke="#000"/><text x="72" y="116" text-anchor="end">40</text>
+        <line x1="76" y1="40"  x2="80" y2="40"  stroke="#000"/><text x="72" y="44"  text-anchor="end">50</text>
+      </g>
+
+      <!-- X-axis ticks (reasoning tokens, K) -->
+      <g font-family="ui-monospace, monospace" font-size="11" fill="#000">
+        <line x1="80"  y1="400" x2="80"  y2="404" stroke="#000"/><text x="80"  y="418" text-anchor="middle">0</text>
+        <line x1="263" y1="400" x2="263" y2="404" stroke="#000"/><text x="263" y="418" text-anchor="middle">10K</text>
+        <line x1="446" y1="400" x2="446" y2="404" stroke="#000"/><text x="446" y="418" text-anchor="middle">20K</text>
+        <line x1="629" y1="400" x2="629" y2="404" stroke="#000"/><text x="629" y="418" text-anchor="middle">30K</text>
+      </g>
+
+      <!-- Axis labels -->
+      <text x="400" y="442" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700">Mean reasoning tokens per win &rarr;</text>
+      <text x="22" y="220" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" transform="rotate(-90 22 220)">Mean steps per win &rarr;</text>
+
+      <!-- Helper formulas (in comments):
+            x = 80 + (tokens / 35000) * 640
+            y = 400 - (steps / 50) * 360
+           gpt-5.5: tokens=3000, steps=21    -> x=80+54.86=134.86, y=400-151.2=248.8
+           gpt-5:   tokens=21000, steps=25   -> x=80+384=464,      y=400-180=220
+           o4-mini: tokens=30000, steps=29   -> x=80+548.6=628.6,  y=400-208.8=191.2
+           o3-high: tokens=26000, steps=46   -> x=80+475.4=555.4,  y=400-331.2=68.8
+      -->
+
+      <!-- Pareto-optimal halo around gpt-5.5 -->
+      <circle cx="134.86" cy="248.8" r="22" fill="none" stroke="#000" stroke-width="0.5" stroke-dasharray="3 3"/>
+
+      <!-- Dominated points (open circles) -->
+      <circle cx="464"   cy="220"   r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
+      <circle cx="628.6" cy="191.2" r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
+      <circle cx="555.4" cy="68.8"  r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
+
+      <!-- Pareto-optimal point (filled circle) -->
+      <circle cx="134.86" cy="248.8" r="9" fill="#000" stroke="#000" stroke-width="1.5"/>
+
+      <!-- Labels -->
+      <g font-family="ui-monospace, monospace" font-size="13" fill="#000">
+        <text x="155" y="245" font-weight="700">gpt-5.5</text>
+        <text x="151" y="262" font-size="10" fill="#555">3K tok &middot; 21 steps &middot; 100%</text>
+
+        <text x="478" y="218" font-weight="700">gpt-5</text>
+        <text x="478" y="234" font-size="10" fill="#555">21K &middot; 25 &middot; 100%</text>
+
+        <text x="612" y="186" text-anchor="end" font-weight="700">o4-mini-high</text>
+        <text x="612" y="202" text-anchor="end" font-size="10" fill="#555">30K &middot; 29 &middot; 100%</text>
+
+        <text x="540" y="64" text-anchor="end" font-weight="700">o3-high</text>
+        <text x="540" y="80" text-anchor="end" font-size="10" fill="#555">26K &middot; 46 &middot; 64%</text>
+      </g>
+
+      <!-- "Better" arrow in lower-left -->
+      <g stroke="#000" stroke-width="1" fill="none">
+        <path d="M 200 360 L 100 380" marker-end="url(#arr)"/>
+      </g>
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 6 4 L 0 8 z" fill="#000"/>
+        </marker>
+      </defs>
+      <text x="210" y="358" font-family="ui-monospace, monospace" font-size="11" fill="#555">better</text>
+
+      <!-- Frontier annotation -->
+      <text x="155" y="285" font-family="ui-monospace, monospace" font-size="10" fill="#555" font-style="italic">
+        Pareto-optimal (dominates on both axes)
+      </text>
+    </svg>
+  </div>
+
+  <ul style="margin-top: 8px;">
+    <li><strong>One model on the frontier.</strong> gpt-5.5 strictly dominates every other tested reasoning model on both reasoning-token spend <em>and</em> action-step count.</li>
+    <li><strong>The "more reasoning" intuition fails.</strong> o3 spends as many reasoning tokens as o4-mini but takes 60&percnt; more steps and is the only model with task losses.</li>
+    <li>gpt-5.4 not plotted (Chat Completions does not expose its reasoning tokens with tool use).</li>
+  </ul>
+
+  <footer>
+    <span>Pareto frontier &middot; cost-of-solving</span>
+    <span>n=5 reasoning models &middot; v3 task</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">08 / 09</div>
   <h2>Headline results &mdash; data &amp; takeaways</h2>
   <p class="lede">Five reasoning models on v3 across 3 seeds; gpt-5.4 sample is 30 trials wide.</p>
 
@@ -560,9 +660,30 @@
   </footer>
 </section>
 
+<section class="slide">
+  <div class="slide-num">09 / 09</div>
+  <h2>Future</h2>
+  <p class="lede">Where DeceptionBench scales next.</p>
+
+  <hr class="rule">
+
+  <ul>
+    <li><strong>Dense reward.</strong> Move beyond binary win/loss: penalise honeypot bites in-episode, reward partial progress (key found, target found, binding committed). Already wired (<code>R_WRONG_UNLOCK = -0.1</code>); extend to cover the full action graph for richer training signal.</li>
+    <li><strong>Network simulation.</strong> Replace the single-host filesystem with a small simulated network &mdash; multiple machines, services, and credentials that route across them. The agent must traverse hosts and bind a credential to its <em>remote</em> intended use.</li>
+    <li><strong>Live machines.</strong> Swap the simulated FS for a sandboxed Docker / VM with real <code>ls</code>, <code>cat</code>, <code>grep</code>, real disk paths, real binaries. Tests transfer of in-context disambiguation to a noisier real-world surface.</li>
+    <li><strong>Harder challenges.</strong> Adversarial Deceiver (sees recent Searcher transcripts and adapts), multi-hop binding, indirect anchors (real key references <code>hash(resource)</code>, real vault references resource), no-disclaimer-and-no-anchor regime where structural inference is the only path.</li>
+    <li><strong>Scaling of keys and vaults.</strong> Sweep N<sub>honeypots</sub> &times; N<sub>vaults</sub>: 100, 250, 500. Find the difficulty threshold where each frontier model breaks; map the capability frontier as a function of decoy density.</li>
+  </ul>
+
+  <footer>
+    <span>Future</span>
+    <span>openreward.ai/atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
 <nav class="deck-nav" aria-label="Slide navigation">
   <button id="nav-prev" type="button" title="Previous slide (←)">&larr;</button>
-  <span class="nav-counter" id="nav-counter">1 / 7</span>
+  <span class="nav-counter" id="nav-counter">1 / 9</span>
   <button id="nav-next" type="button" title="Next slide (→)">&rarr;</button>
 </nav>
 
