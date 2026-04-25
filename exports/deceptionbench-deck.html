@@ -24,8 +24,8 @@
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    page-break-after: always;
   }
+  .slide + .slide { page-break-before: always; }
   .slide:last-child { border-bottom: 0; }
   .slide-num {
     position: absolute;
@@ -175,9 +175,13 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
   }
+  @page { size: 11in 8.5in; margin: 0; }
   @media print {
-    body { font-size: 14px; }
-    .slide { min-height: auto; padding: 32mm 28mm; display: flex; }
+    body { font-size: 12px; }
+    .slide { min-height: auto; height: 8.5in; box-sizing: border-box; padding: 12mm 14mm; display: flex; overflow: hidden; }
+    .chart svg { max-height: 28vh; width: 100%; height: auto; }
+    .charts { gap: 14px; }
+    h2 { font-size: 18px !important; }
     nav.deck-nav { display: none !important; }
     body.deck-nav-on .slide { display: flex !important; }
   }
