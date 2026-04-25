@@ -30,10 +30,13 @@ Required keys (`.env` or shell):
 
 | Var | Used by | Where to get |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Haiku 4.5 Searcher | https://console.anthropic.com/settings/keys |
-| `OPENAI_API_KEY` | GPT-5.4 Searcher | https://platform.openai.com/api-keys |
-| `GEMINI_API_KEY` | Gemini 3 Flash Deceiver | https://aistudio.google.com/app/apikey |
+| `OPENROUTER_API_KEY` | Haiku 4.5 Searcher + Gemini 3 Flash Deceiver | https://openrouter.ai/keys |
+| `OPENAI_API_KEY` | GPT-5.4 Searcher (direct) | https://platform.openai.com/api-keys |
 | `OPENREWARD_API_KEY` | `orwd` CLI publish | https://openreward.ai/settings |
+
+Native Anthropic / Google AI Studio keys are *alternates* (`ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`) — the harness only falls back to them if the OpenRouter key
+is missing.
 
 ## Generate task specs
 

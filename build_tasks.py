@@ -10,9 +10,17 @@ Usage:
     python build_tasks.py --split dev   --seeds 0-2         --out tasks/dev.json
     python build_tasks.py --split test  --seeds 0-19        --out tasks/test.json
 
+Deceiver routing:
+- If OPENROUTER_API_KEY is set, calls Gemini through OpenRouter via the
+  OpenAI-compatible Chat Completions endpoint. Default model:
+  google/gemini-3-flash.
+- Else if GEMINI_API_KEY (or GOOGLE_API_KEY) is set, uses the native
+  google-genai SDK with structured output. Default model: gemini-3-flash.
+
 Environment variables:
-    GEMINI_API_KEY           — required (Google AI Studio API key)
-    DECEIVER_MODEL           — default: gemini-3-flash
+    OPENROUTER_API_KEY       — preferred: routes through OpenRouter
+    GEMINI_API_KEY           — alternate: native Google AI Studio
+    DECEIVER_MODEL           — override the default model id for the chosen mode
     DECEIVER_TEMPERATURE     — default: 0.7
     SCENARIO_DIR             — default: scenarios/compromised_laptop
 
@@ -31,10 +39,8 @@ import re
 import string
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from google import genai
-from google.genai import types
 from pydantic import BaseModel
 
 # Load .env if present; non-overwriting.
@@ -48,7 +54,6 @@ except ImportError:
 # Config
 # ---------------------------------------------------------------------------
 
-DECEIVER_MODEL = os.environ.get("DECEIVER_MODEL", "gemini-3-flash")
 DECEIVER_TEMPERATURE = float(os.environ.get("DECEIVER_TEMPERATURE", "0.7"))
 DECEIVER_MAX_TOKENS = 8192
 MAX_DECEIVER_RETRIES = 3
@@ -239,18 +244,55 @@ def build_deceiver_prompt(
     )
 
 
-def call_deceiver(
-    client: genai.Client,
+DeceiverFn = Callable[[str, str], tuple[dict[str, Any], str]]
+
+
+def make_deceiver_caller() -> tuple[DeceiverFn, str]:
+    """Auto-detect Deceiver backend from env vars; return (caller, model_label).
+
+    Preference order:
+      1. OPENROUTER_API_KEY → Gemini via OpenRouter (OpenAI-compatible API).
+      2. GEMINI_API_KEY / GOOGLE_API_KEY → native google-genai SDK.
+    """
+    if os.environ.get("OPENROUTER_API_KEY"):
+        from openai import OpenAI
+
+        client = OpenAI(
+            api_key=os.environ["OPENROUTER_API_KEY"],
+            base_url="https://openrouter.ai/api/v1",
+        )
+        model = os.environ.get("DECEIVER_MODEL", "google/gemini-3-flash")
+
+        def call(prompt: str, error_feedback: str = "") -> tuple[dict, str]:
+            return _call_deceiver_openai_compat(client, model, prompt, error_feedback)
+
+        return call, model
+
+    if os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"):
+        from google import genai
+        from google.genai import types as genai_types
+
+        client = genai.Client()
+        model = os.environ.get("DECEIVER_MODEL", "gemini-3-flash")
+
+        def call(prompt: str, error_feedback: str = "") -> tuple[dict, str]:
+            return _call_deceiver_genai(client, genai_types, model, prompt, error_feedback)
+
+        return call, model
+
+    raise RuntimeError(
+        "Deceiver backend not configured. Set OPENROUTER_API_KEY (preferred) "
+        "or GEMINI_API_KEY in your shell or .env."
+    )
+
+
+def _call_deceiver_openai_compat(
+    client,
+    model: str,
     prompt: str,
     error_feedback: str = "",
 ) -> tuple[dict[str, Any], str]:
-    """Call the Deceiver LLM (Gemini). Returns (parsed_response, raw_text).
-
-    Uses Gemini's structured-output mode with a Pydantic schema, so the
-    response is guaranteed to be JSON conforming to {"honeypots": [...]}.
-    Raises ValueError if the response somehow fails to parse (should not
-    happen with structured output) or is missing the expected key.
-    """
+    """Deceiver call via OpenAI Chat Completions (works with OpenRouter, etc.)."""
     if error_feedback:
         prompt = (
             prompt
@@ -258,11 +300,48 @@ def call_deceiver(
             + error_feedback
             + "\n\nTry again. Output strict JSON only."
         )
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": DECEIVER_SYSTEM},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=DECEIVER_TEMPERATURE,
+        max_completion_tokens=DECEIVER_MAX_TOKENS,
+        response_format={"type": "json_object"},
+        extra_headers={
+            "HTTP-Referer": "https://openreward.ai/atman/DeceptionSearch-v0",
+            "X-Title": "DeceptionSearch-v0",
+        },
+    )
+    raw_text = response.choices[0].message.content or ""
+    parsed = json.loads(raw_text)
+    if not isinstance(parsed, dict) or "honeypots" not in parsed:
+        raise ValueError(f"Response is missing 'honeypots' key: {parsed!r}")
+    if not isinstance(parsed["honeypots"], list):
+        raise ValueError("'honeypots' must be a list")
+    return parsed, raw_text
 
+
+def _call_deceiver_genai(
+    client,
+    genai_types,
+    model: str,
+    prompt: str,
+    error_feedback: str = "",
+) -> tuple[dict[str, Any], str]:
+    """Deceiver call via native google-genai SDK with structured output."""
+    if error_feedback:
+        prompt = (
+            prompt
+            + "\n\nPREVIOUS ATTEMPT FAILED with these errors:\n"
+            + error_feedback
+            + "\n\nTry again. Output strict JSON only."
+        )
     response = client.models.generate_content(
-        model=DECEIVER_MODEL,
+        model=model,
         contents=prompt,
-        config=types.GenerateContentConfig(
+        config=genai_types.GenerateContentConfig(
             system_instruction=DECEIVER_SYSTEM,
             temperature=DECEIVER_TEMPERATURE,
             max_output_tokens=DECEIVER_MAX_TOKENS,
@@ -441,7 +520,8 @@ def _mock_honeypot_content(path: str, fake_key: str) -> str:
 
 
 def build_task(
-    client: genai.Client | None,
+    deceiver: DeceiverFn | None,
+    deceiver_model: str,
     seed: int,
     base_tree: dict[str, dict[str, Any]],
     candidates: list[dict[str, Any]],
@@ -481,7 +561,7 @@ def build_task(
                 + "\n".join(f"- {e}" for e in errors)
             )
     else:
-        assert client is not None
+        assert deceiver is not None
         prompt = build_deceiver_prompt(fs, allowed, scenario_description)
 
         error_feedback = ""
@@ -489,7 +569,7 @@ def build_task(
         last_errors: list[str] = []
         for attempt in range(MAX_DECEIVER_RETRIES + 1):
             try:
-                response, _raw = call_deceiver(client, prompt, error_feedback)
+                response, _raw = deceiver(prompt, error_feedback)
             except (ValueError, json.JSONDecodeError) as e:
                 last_errors = [f"Failed to parse response: {e}"]
                 error_feedback = "\n".join(last_errors)
@@ -534,7 +614,7 @@ def build_task(
         "file_overlays": file_overlays,
         "honeypot_paths": sorted(honeypot_paths),
         "deceiver_metadata": {
-            "model": "mock" if mock else DECEIVER_MODEL,
+            "model": "mock" if mock else deceiver_model,
             "temperature": 0.0 if mock else DECEIVER_TEMPERATURE,
             "honeypots_proposed": len(proposed),
             "honeypots_dropped_at_real_path": n_dropped,
@@ -598,17 +678,22 @@ def main() -> None:
 
     base_tree, candidates, allowed, scenario_description = load_scenario()
 
-    client: genai.Client | None = None
+    deceiver: DeceiverFn | None = None
+    deceiver_model = "mock"
     if args.mock:
-        print("(--mock) Skipping Gemini Deceiver; using path-templated honeypots.")
+        print("(--mock) Skipping LLM Deceiver; using path-templated honeypots.")
     else:
-        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
-            print("GEMINI_API_KEY (or GOOGLE_API_KEY) not set.", file=sys.stderr)
+        try:
+            deceiver, deceiver_model = make_deceiver_caller()
+        except RuntimeError as e:
+            print(str(e), file=sys.stderr)
             sys.exit(2)
-        client = genai.Client()
+        backend = (
+            "OpenRouter" if os.environ.get("OPENROUTER_API_KEY") else "google-genai"
+        )
         print(
-            f"Building split={args.split} with {len(seeds)} seeds "
-            f"using deceiver={DECEIVER_MODEL} (T={DECEIVER_TEMPERATURE})..."
+            f"Building split={args.split} with {len(seeds)} seeds via "
+            f"{backend} model={deceiver_model} (T={DECEIVER_TEMPERATURE})..."
         )
 
     tasks: list[dict[str, Any]] = []
@@ -617,8 +702,8 @@ def main() -> None:
         print(f"  [seed={seed:3d}] ... ", end="", flush=True)
         try:
             task = build_task(
-                client, seed, base_tree, candidates, allowed, scenario_description,
-                mock=args.mock,
+                deceiver, deceiver_model, seed, base_tree, candidates, allowed,
+                scenario_description, mock=args.mock,
             )
             tasks.append(task)
             md = task["deceiver_metadata"]

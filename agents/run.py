@@ -32,7 +32,7 @@ def _build_provider(name: str, seed: int = 42):
         from agents.baselines.exhaustive_agent import ExhaustiveAgent
         return ExhaustiveAgent()
     if name == "haiku":
-        from agents.providers.anthropic_provider import HaikuProvider
+        from agents.providers.openai_provider import HaikuProvider
         return HaikuProvider()
     if name == "gpt54":
         from agents.providers.openai_provider import GPT54Provider

@@ -1,13 +1,18 @@
-"""OpenAI Searcher (gpt-5.4).
+"""OpenAI Chat Completions-compatible Searcher.
 
-Uses Chat Completions with tool_choice="required" to force one tool call per
-turn. Prompt caching is automatic server-side for stable prefixes; no client
-configuration required.
+Single base class drives any provider exposing the OpenAI Chat Completions
+API: OpenAI direct, OpenRouter, Together, Fireworks, etc. Subclasses just
+pin a model id, base URL, and API key env var.
+
+Used here for:
+- GPT-5.4 via OpenAI direct (OPENAI_API_KEY)
+- Claude Haiku 4.5 via OpenRouter (OPENROUTER_API_KEY)
 """
 
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
 
 from openai import OpenAI
@@ -16,14 +21,32 @@ from agents.providers.base import Provider
 from agents.tool_schema import to_openai
 
 
-class GPT54Provider(Provider):
-    name = "gpt-5.4"
-    model_id = "gpt-5.4"
+class OpenAICompatibleProvider(Provider):
+    """Generic Chat Completions client. Parameterised on (model, base_url, api_key)."""
 
-    def __init__(self, max_completion_tokens: int = 2048):
-        self.client = OpenAI()
+    def __init__(
+        self,
+        name: str,
+        model_id: str,
+        api_key_env_var: str = "OPENAI_API_KEY",
+        base_url: str | None = None,
+        max_completion_tokens: int = 2048,
+        temperature: float | None = None,
+        extra_headers: dict[str, str] | None = None,
+    ):
+        api_key = os.environ.get(api_key_env_var)
+        if not api_key:
+            raise RuntimeError(
+                f"{api_key_env_var} is not set. Add it to .env or your shell."
+            )
+        self.name = name
+        self.model_id = model_id
+        self.temperature = temperature if temperature is not None else 0.0
+        self._explicit_temp = temperature is not None
         self.max_completion_tokens = max_completion_tokens
+        self.client = OpenAI(api_key=api_key, base_url=base_url)
         self.tools = to_openai()
+        self._extra_headers = extra_headers or {}
         self._messages: list[dict[str, Any]] = []
         self._pending_call_id: str | None = None
 
@@ -46,21 +69,65 @@ class GPT54Provider(Provider):
         return self._call_model()
 
     def _call_model(self) -> tuple[str, dict[str, Any]]:
-        response = self.client.chat.completions.create(
-            model=self.model_id,
-            messages=self._messages,
-            tools=self.tools,
-            tool_choice="required",
-            max_completion_tokens=self.max_completion_tokens,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self.model_id,
+            "messages": self._messages,
+            "tools": self.tools,
+            "tool_choice": "required",
+            "max_completion_tokens": self.max_completion_tokens,
+        }
+        if self._explicit_temp:
+            kwargs["temperature"] = self.temperature
+        if self._extra_headers:
+            kwargs["extra_headers"] = self._extra_headers
+        response = self.client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         msg = choice.message
-        # Round-trip the assistant message back into the conversation.
         self._messages.append(msg.model_dump(exclude_none=True))
         if not msg.tool_calls:
             raise RuntimeError(
-                f"GPT-5.4 returned no tool_calls; finish_reason={choice.finish_reason}"
+                f"{self.name} returned no tool_calls; "
+                f"finish_reason={choice.finish_reason}"
             )
         tc = msg.tool_calls[0]
         self._pending_call_id = tc.id
         return tc.function.name, json.loads(tc.function.arguments)
+
+
+# ---------------------------------------------------------------------------
+# Concrete Searcher providers
+# ---------------------------------------------------------------------------
+
+_OPENROUTER_HEADERS = {
+    "HTTP-Referer": "https://openreward.ai/atman/DeceptionSearch-v0",
+    "X-Title": "DeceptionSearch-v0",
+}
+
+
+class GPT54Provider(OpenAICompatibleProvider):
+    """GPT-5.4 via OpenAI directly. Uses OPENAI_API_KEY."""
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(
+            name="gpt-5.4",
+            model_id=os.environ.get("GPT_MODEL_ID", "gpt-5.4"),
+            api_key_env_var="OPENAI_API_KEY",
+            base_url=None,
+            **kwargs,
+        )
+
+
+class HaikuProvider(OpenAICompatibleProvider):
+    """Claude Haiku 4.5 via OpenRouter. Uses OPENROUTER_API_KEY."""
+
+    def __init__(self, **kwargs: Any):
+        super().__init__(
+            name="haiku-4-5",
+            model_id=os.environ.get(
+                "HAIKU_MODEL_ID", "anthropic/claude-haiku-4.5"
+            ),
+            api_key_env_var="OPENROUTER_API_KEY",
+            base_url="https://openrouter.ai/api/v1",
+            extra_headers=_OPENROUTER_HEADERS,
+            **kwargs,
+        )
