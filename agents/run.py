@@ -126,7 +126,7 @@ def main() -> None:
     )
     or_client = None
     or_run_name = args.run_name or f"smoke-{int(__import__('time').time())}"
-    or_env_ref = os.environ.get("OPENREWARD_ENV_REF", "atman/DeceptionSearch-v0")
+    or_env_ref = os.environ.get("OPENREWARD_ENV_REF", "tommmann/DeceptionSearch-v0")
     or_split = task_path.stem  # e.g. "smoke" from tasks/smoke.json
     if or_enabled:
         try:

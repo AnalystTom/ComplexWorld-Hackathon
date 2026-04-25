@@ -37,13 +37,13 @@ ROLL_OUT_TARGETS: dict[str, RolloutTarget] = {
     ),
     "deception": RolloutTarget(
         key="deception",
-        env_ref="atman/DeceptionSearch-v0",
+        env_ref="tommmann/DeceptionSearch-v0",
         run_name="deception-search-run-1",
         default_split="smoke",
     ),
     "network": RolloutTarget(
         key="network",
-        env_ref="atman/NetworkBenchmark-v0",
+        env_ref="tommmann/NetworkBenchmark-v0",
         run_name="network-benchmark-run-1",
         default_split="smoke",
     ),

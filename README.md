@@ -92,8 +92,8 @@ python -m pytest tests/ -v
 
 ## Publish to OpenReward
 
-The env is registered as **`atman/DeceptionSearch-v0`** at
-https://openreward.ai/atman/DeceptionSearch-v0.
+The env is registered as **`tommmann/DeceptionSearch-v0`** at
+https://openreward.ai/tommmann/DeceptionSearch-v0.
 
 ```bash
 # Confirm auth
@@ -101,14 +101,14 @@ orwd whoami
 
 # Register the env (one-time)
 orwd create DeceptionSearch-v0 \
-  --namespace atman \
+  --namespace tommmann \
   --description "Find a hidden AWS access key in a simulated dev laptop populated with LLM-generated decoys."
 
 # Wire to this GitHub repo (auto-deploys on push)
-orwd link atman/DeceptionSearch-v0 AnalystTom/ComplexWorld-Hackathon
+orwd link tommmann/DeceptionSearch-v0 AnalystTom/ComplexWorld-Hackathon
 
 # Upload the world + task specs to the env's file store (mounted at /orwd_data)
-orwd upload atman/DeceptionSearch-v0 \
+orwd upload tommmann/DeceptionSearch-v0 \
   scenarios/compromised_laptop/base_tree.json \
   tasks/smoke.json \
   tasks/dev.json \
@@ -116,26 +116,26 @@ orwd upload atman/DeceptionSearch-v0 \
 ```
 
 After link + upload, hosted runs invoke the env at
-`https://openreward.ai/atman/DeceptionSearch-v0`. The env class identifies
+`https://openreward.ai/tommmann/DeceptionSearch-v0`. The env class identifies
 itself with `name() == "DeceptionSearch-v0"` (see `server.py`).
 
 For the network benchmark, register a second env such as
-**`atman/NetworkBenchmark-v0`**. Unlike DeceptionSearch, the curated
+**`tommmann/NetworkBenchmark-v0`**. Unlike DeceptionSearch, the curated
 MiniCyberBench tasks live in the repo under `network_benchmark/scenarios/`, so
 there is no separate world upload step.
 
 ```bash
 orwd create NetworkBenchmark-v0 \
-  --namespace atman \
+  --namespace tommmann \
   --description "MiniCyberBench v1: a deterministic network-security benchmark with abstract cyber actions."
 
-orwd link atman/NetworkBenchmark-v0 AnalystTom/ComplexWorld-Hackathon
+orwd link tommmann/NetworkBenchmark-v0 AnalystTom/ComplexWorld-Hackathon
 ```
 
 Then use:
 
 ```bash
-python run_rollout.py --env network --env-ref atman/NetworkBenchmark-v0 --split smoke
+python run_rollout.py --env network --env-ref tommmann/NetworkBenchmark-v0 --split smoke
 ```
 
 ## Layout
