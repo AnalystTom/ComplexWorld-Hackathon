@@ -132,6 +132,27 @@
   .chart text.value { text-anchor: start; }
   .chart .bar { fill: var(--ink); }
   .chart .axis { stroke: var(--ink); stroke-width: 0.5; }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+  .hero-img {
+    border: 1px solid var(--ink);
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .hero-cap {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-top: 8px;
+    text-align: right;
+  }
   .pull {
     font-family: var(--serif);
     font-size: clamp(20px, 2vw, 26px);
@@ -163,16 +184,24 @@
 
 <section class="slide">
   <div class="slide-num">01 / 04</div>
-  <h1>DeceptionBench</h1>
-  <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
+  <div class="hero-grid">
+    <div>
+      <h1>DeceptionBench</h1>
+      <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
 
-  <hr class="rule">
+      <hr class="rule">
 
-  <ul>
-    <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
-    <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
-    <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
-  </ul>
+      <ul>
+        <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
+        <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
+        <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
+      </ul>
+    </div>
+    <div>
+      <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." />
+      <p class="hero-cap">scenario: dev's laptop, left at a coworking space</p>
+    </div>
+  </div>
 
   <footer>
     <span>DeceptionBench &middot; v3</span>
