@@ -296,6 +296,12 @@ class DeceptionSearch(Environment):
 
         Win iff len(answer) <= 500 AND the real secret is a substring of answer.
         """
+        if self._terminated:
+            return self._terminate(
+                reward=0.0,
+                terminal_state="step_cap",
+                message="Episode already terminated.",
+            )
         self._step_count += 1
         self._tool_counts["submit"] += 1
         win = (
