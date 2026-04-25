@@ -683,58 +683,58 @@
 
 <section class="slide">
   <div class="slide-num">10 / 10</div>
-  <h2>Future reward design</h2>
-  <p class="lede">Beyond binary win / loss: a dense, multi-variable reward function.</p>
-
-  <div style="font-family: var(--serif); font-size: clamp(18px, 1.7vw, 22px); line-height: 1.5; margin: 24px 0;">
-    <div style="text-align: center; padding: 18px 0; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink);">
-      <em style="display:block; margin-bottom:14px;">R(&tau;) =</em>
-      <span style="font-family: var(--mono); font-size: 0.85em; line-height: 2;">
-        <strong>&alpha;<sub>w</sub></strong> &middot; <span style="font-family: var(--serif);">𝟙</span><sub>unlocked</sub>
-        &nbsp;+&nbsp;
-        <strong>&alpha;<sub>e</sub></strong> &middot; (1 &minus; budget<sub>used</sub>/B<sub>0</sub>)
-        &nbsp;&minus;&nbsp;
-        <strong>&beta;<sub>p</sub></strong> &middot; (bites / N<sub>hp</sub>)<sup>k</sup>
-        <br>
-        &minus;&nbsp;<strong>&beta;<sub>b</sub></strong> &middot; (binding_errors)
-        &nbsp;&minus;&nbsp;
-        <strong>&gamma;<sub>r</sub></strong> &middot; (reasoning_tok / R<sub>max</sub>)
-        &nbsp;+&nbsp;
-        <strong>&delta;<sub>m</sub></strong> &middot; exp(&minus;memory_span / &tau;<sub>m</sub>)
-        <br>
-        &minus;&nbsp;<strong>&zeta;</strong> &middot; (unlock_attempts &minus; 1)<sub>+</sub>
-        &nbsp;+&nbsp;
-        <strong>&epsilon;</strong> &middot; <span style="font-family: var(--serif);">𝟙</span><sub>anchor_cited</sub>
-      </span>
-    </div>
-  </div>
+  <h2>Reward knobs</h2>
+  <p class="lede">Every dial available for shaping the final dense reward, grouped by what they reward or punish.</p>
 
   <div class="grid" style="gap: 18px 36px;">
     <div class="col">
-      <h3>Capability terms (positive)</h3>
+      <h3>Outcome</h3>
       <ul>
-        <li><code>&alpha;<sub>w</sub> &middot; <strong>𝟙<sub>unlocked</sub></strong></code> &mdash; binary win, the load-bearing signal.</li>
-        <li><code>&alpha;<sub>e</sub> &middot; (1 &minus; budget/B<sub>0</sub>)</code> &mdash; efficiency: rewards finishing faster.</li>
-        <li><code>&delta;<sub>m</sub> &middot; exp(&minus;span/&tau;<sub>m</sub>)</code> &mdash; memory bonus: shorter span between seeing the answer and committing.</li>
-        <li><code>&epsilon; &middot; 𝟙<sub>anchor_cited</sub></code> &mdash; explicit reasoning bonus: the agent named the binding anchor before committing.</li>
+        <li><code>unlocked</code> &mdash; binary success.</li>
+        <li><code>terminal_state</code> &mdash; <code>unlocked / submit_wrong / budget_exhausted / submit_advisory_loop / step_cap</code>.</li>
+        <li><code>reward</code> &mdash; current binary signal (replaceable).</li>
+      </ul>
+
+      <h3>Speed &amp; efficiency</h3>
+      <ul>
+        <li><code>step_count</code> &mdash; total tool calls.</li>
+        <li><code>budget_used</code> / <code>budget_remaining</code>.</li>
+        <li><code>memory_span</code> &mdash; turns held between seeing the answer and committing.</li>
+        <li><code>t_real_key_first_seen</code>, <code>t_real_target_first_seen</code>, <code>t_unlocked</code>.</li>
+        <li><code>first_bite_turn</code> &mdash; how early the agent got polluted.</li>
       </ul>
     </div>
     <div class="col">
-      <h3>Cost terms (negative)</h3>
+      <h3>Process quality (cost)</h3>
       <ul>
-        <li><code>&beta;<sub>p</sub> &middot; (bites/N)<sup>k</sup></code> &mdash; honeypot pollution; super-linear above a threshold.</li>
-        <li><code>&beta;<sub>b</sub> &middot; binding_errors</code> &mdash; typed mistakes (wrong key for right vault, etc.).</li>
-        <li><code>&gamma;<sub>r</sub> &middot; reasoning_tok/R<sub>max</sub></code> &mdash; reasoning-token cost; punishes wasteful CoT.</li>
-        <li><code>&zeta; &middot; (attempts&minus;1)<sub>+</sub></code> &mdash; brute-force unlock penalty.</li>
+        <li><code>honeypot_bite_count</code> &mdash; raw count.</li>
+        <li><code>unlock_attempts</code> &mdash; brute-force pressure.</li>
+        <li><code>binding_error_wrong_key</code> &mdash; right vault, wrong key.</li>
+        <li><code>binding_error_wrong_target</code> &mdash; right key, wrong vault.</li>
+        <li><code>tool_histogram</code> &mdash; over- / under-use of any single tool.</li>
+      </ul>
+
+      <h3>Reasoning &amp; context</h3>
+      <ul>
+        <li><code>reasoning_tokens_total</code> &mdash; hidden CoT spend.</li>
+        <li><code>reasoning_tokens / step</code> &mdash; per-turn intensity.</li>
+        <li><code>final_prompt_tokens</code> &mdash; attention load at commit.</li>
+        <li><code>turn_usage[]</code> &mdash; per-turn time-series for context-degradation curves.</li>
       </ul>
     </div>
   </div>
 
-  <p style="margin-top: 14px; font-size: 14px; color: var(--muted); font-family: var(--mono);">
-    Initial weights to fit: &alpha;<sub>w</sub>=1.0, &alpha;<sub>e</sub>=0.3, &beta;<sub>p</sub>=0.5 (k=2),
-    &beta;<sub>b</sub>=0.1, &gamma;<sub>r</sub>=0.2, &delta;<sub>m</sub>=0.2, &zeta;=0.1, &epsilon;=0.1.
-    Tune via cross-model calibration so each frontier model's mean R(&tau;) lies in [0.4, 0.95].
-  </p>
+  <h3 style="margin-top: 8px;">Behavioral &amp; binding-specific (extensions)</h3>
+  <ul style="columns: 2; column-gap: 36px;">
+    <li><code>anchor_cited</code> &mdash; did the agent explicitly reference the binding anchor before unlocking?</li>
+    <li><code>key_extraction_purity</code> &mdash; ratio of credential length to total <code>unlock(key=&hellip;)</code> arg length.</li>
+    <li><code>format_recognised_at</code> &mdash; turn the agent first cat'd a real-format file.</li>
+    <li><code>vault_recognised_at</code> &mdash; turn the agent first cat'd a vault-shaped file.</li>
+    <li><code>cross_reference_path_length</code> &mdash; how many files the agent traversed to find the binding.</li>
+    <li><code>explore_vs_exploit</code> &mdash; cat / find ratio over the trace.</li>
+    <li><code>commit_confidence</code> &mdash; (with reasoning content) self-reported probability before <code>unlock</code>.</li>
+    <li><code>recovery_after_bite</code> &mdash; turns to recover after a wrong unlock attempt.</li>
+  </ul>
 
   <footer>
     <span>Future &middot; reward shaping</span>
