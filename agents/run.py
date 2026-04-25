@@ -154,9 +154,13 @@ def main() -> None:
             )
             rollout = None
             if or_client is not None and agent_name in ("haiku", "gpt54"):
+                # Use the provider's actual model id (e.g. gpt-5.5, gpt-4o)
+                # for the rollout label so OR's UI distinguishes runs that
+                # share an --agent CLI flag but vary GPT_MODEL_ID.
+                rollout_label = f"{provider.name}-trial{trial+1}"
                 rollout = or_client.rollout.create(
                     run_name=or_run_name,
-                    rollout_name=f"{agent_name}-trial{trial+1}",
+                    rollout_name=rollout_label,
                     environment=or_env_ref,
                     split=or_split,
                     task_spec=task_spec,
