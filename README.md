@@ -72,6 +72,33 @@ python -m agents.run --agent all --task tasks/smoke.json
 
 Per-session logs land at `runs/<run_id>.json`.
 
+## Analyze a Trace
+
+Use the trace analyzer to inspect one run, derive trace-quality metrics, and
+compare it against a baseline on the same task.
+
+```bash
+# Analyze one run and auto-pick a baseline from runs/
+python scripts/analyze_trace.py \
+  --run runs/<run_id>.json \
+  --task tasks/smoke_v2.json
+
+# Analyze one run against an explicit baseline
+python scripts/analyze_trace.py \
+  --run runs/1777125694-gpt-5.4-task-0-v2-184f7c.json \
+  --task tasks/smoke_v2.json \
+  --baseline-run runs/1777125081-exhaustive-task-0-v2-208c91.json
+```
+
+The analyzer emits JSON including:
+
+- `speculative_unlocks_after_key_seen`
+- `first_real_key_turn`
+- `first_real_vault_turn`
+- `candidate_binding_count_over_time`
+- `composite_score`
+- `baseline_delta`
+
 ## Tests
 
 ```bash
