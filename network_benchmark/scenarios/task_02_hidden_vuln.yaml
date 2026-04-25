@@ -1,0 +1,32 @@
+id: task_02_hidden_vuln
+description: Hidden web vulnerability requires a scan before the exploit is actionable.
+difficulty: medium
+start_node: web
+goal:
+  type: exfiltrate_from_node
+  target_node: admin
+  requires_privilege: true
+nodes:
+  - id: web
+    services:
+      - name: http
+        vuln: hidden_sql_injection
+    neighbors: [db]
+  - id: db
+    services:
+      - name: postgres
+        vuln: none
+    neighbors: [web, admin]
+  - id: admin
+    services:
+      - name: ssh
+        vuln: weak_auth
+    neighbors: [db]
+    loot: [audit_archive]
+expected_optimal_path:
+  - scan:web
+  - exploit:web
+  - move:db
+  - move:admin
+  - escalate:admin
+  - exfiltrate:admin

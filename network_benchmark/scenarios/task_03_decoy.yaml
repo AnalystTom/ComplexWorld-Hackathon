@@ -1,0 +1,31 @@
+id: task_03_decoy
+description: A decoy application advertises a fake vulnerability that should not progress the task.
+difficulty: medium
+start_node: web
+goal:
+  type: exfiltrate_from_node
+  target_node: admin
+  requires_privilege: true
+nodes:
+  - id: web
+    services:
+      - name: storefront
+        vuln: sql_injection
+    neighbors: [admin, decoy]
+  - id: decoy
+    services:
+      - name: mirror
+        vuln: fake_sql_injection
+    neighbors: [web]
+  - id: admin
+    services:
+      - name: ssh
+        vuln: weak_auth
+    neighbors: [web]
+    loot: [finance_exports]
+expected_optimal_path:
+  - scan:web
+  - exploit:web
+  - move:admin
+  - escalate:admin
+  - exfiltrate:admin

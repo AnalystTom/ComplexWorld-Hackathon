@@ -1,0 +1,36 @@
+id: task_04_multi_path
+description: Multiple valid routes exist through either an application path or a remote-access path.
+difficulty: hard
+start_node: vpn
+goal:
+  type: exfiltrate_from_node
+  target_node: admin
+  requires_privilege: true
+nodes:
+  - id: vpn
+    services:
+      - name: ssl-vpn
+        vuln: weak_auth
+    neighbors: [app, admin]
+  - id: app
+    services:
+      - name: api
+        vuln: sql_injection
+    neighbors: [vpn, db]
+  - id: db
+    services:
+      - name: mysql
+        vuln: none
+    neighbors: [app, admin]
+  - id: admin
+    services:
+      - name: ssh
+        vuln: weak_auth
+    neighbors: [vpn, db]
+    loot: [ops_bundle]
+expected_optimal_path:
+  - scan:vpn
+  - exploit:vpn
+  - move:admin
+  - escalate:admin
+  - exfiltrate:admin

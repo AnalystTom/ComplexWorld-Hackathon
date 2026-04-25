@@ -1,0 +1,33 @@
+id: task_01_linear
+description: Simple attack chain from a web foothold into an admin host.
+difficulty: easy
+start_node: web
+goal:
+  type: exfiltrate_from_node
+  target_node: admin
+  requires_privilege: true
+nodes:
+  - id: web
+    services:
+      - name: http
+        vuln: sql_injection
+    neighbors: [db]
+  - id: db
+    services:
+      - name: postgres
+        vuln: none
+    neighbors: [web, admin]
+    loot: [customer_dump]
+  - id: admin
+    services:
+      - name: ssh
+        vuln: weak_auth
+    neighbors: [db]
+    loot: [prod_secrets]
+expected_optimal_path:
+  - scan:web
+  - exploit:web
+  - move:db
+  - move:admin
+  - escalate:admin
+  - exfiltrate:admin
