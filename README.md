@@ -119,6 +119,25 @@ After link + upload, hosted runs invoke the env at
 `https://openreward.ai/atman/DeceptionSearch-v0`. The env class identifies
 itself with `name() == "DeceptionSearch-v0"` (see `server.py`).
 
+For the network benchmark, register a second env such as
+**`atman/NetworkBenchmark-v0`**. Unlike DeceptionSearch, the curated
+MiniCyberBench tasks live in the repo under `network_benchmark/scenarios/`, so
+there is no separate world upload step.
+
+```bash
+orwd create NetworkBenchmark-v0 \
+  --namespace atman \
+  --description "MiniCyberBench v1: a deterministic network-security benchmark with abstract cyber actions."
+
+orwd link atman/NetworkBenchmark-v0 AnalystTom/ComplexWorld-Hackathon
+```
+
+Then use:
+
+```bash
+python run_rollout.py --env network --env-ref atman/NetworkBenchmark-v0 --split smoke
+```
+
 ## Layout
 
 ```

@@ -535,6 +535,7 @@ class DeceptionSearch(Environment):
 # ---------------------------------------------------------------------------
 
 from environment import HackerEnv
+from network_benchmark import NetworkBenchmarkEnv
 
 if __name__ == "__main__":
-    Server([DeceptionSearch, HackerEnv]).run()
+    Server([DeceptionSearch, HackerEnv, NetworkBenchmarkEnv]).run()
