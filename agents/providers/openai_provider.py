@@ -145,12 +145,16 @@ _OPENROUTER_HEADERS = {
 
 
 class GPT54Provider(OpenAICompatibleProvider):
-    """GPT-5.4 via OpenAI directly. Uses OPENAI_API_KEY."""
+    """OpenAI GPT model. Defaults to gpt-5.4 unless GPT_MODEL_ID is set."""
 
     def __init__(self, **kwargs: Any):
+        model_id = os.environ.get("GPT_MODEL_ID", "gpt-5.4")
         super().__init__(
-            name="gpt-5.4",
-            model_id=os.environ.get("GPT_MODEL_ID", "gpt-5.4"),
+            # Use the actual model id as the label so OR rollouts and local
+            # logs distinguish gpt-5.4 / gpt-5.5 / gpt-4o etc when running
+            # the same harness with different GPT_MODEL_ID overrides.
+            name=model_id,
+            model_id=model_id,
             api_key_env_var="OPENAI_API_KEY",
             base_url=None,
             **kwargs,
@@ -158,14 +162,15 @@ class GPT54Provider(OpenAICompatibleProvider):
 
 
 class HaikuProvider(OpenAICompatibleProvider):
-    """Claude Haiku 4.5 via OpenRouter. Uses OPENROUTER_API_KEY."""
+    """Claude (default Haiku 4.5) via OpenRouter. Uses OPENROUTER_API_KEY."""
 
     def __init__(self, **kwargs: Any):
+        model_id = os.environ.get("HAIKU_MODEL_ID", "anthropic/claude-haiku-4.5")
+        # Strip the OpenRouter org/ prefix for a cleaner rollout label.
+        label = model_id.split("/", 1)[-1]
         super().__init__(
-            name="haiku-4-5",
-            model_id=os.environ.get(
-                "HAIKU_MODEL_ID", "anthropic/claude-haiku-4.5"
-            ),
+            name=label,
+            model_id=model_id,
             api_key_env_var="OPENROUTER_API_KEY",
             base_url="https://openrouter.ai/api/v1",
             extra_headers=_OPENROUTER_HEADERS,
