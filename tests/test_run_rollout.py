@@ -1,7 +1,10 @@
 from run_rollout import (
     RolloutTarget,
+    build_agent_messages,
+    get_rollout_api,
     get_rollout_target,
     infer_solved,
+    rollout_mode_for_env,
     summarize_task,
 )
 
@@ -50,3 +53,24 @@ def test_infer_solved_prefers_terminal_metadata() -> None:
         terminal_metadata={"success": False, "result": "wrong_target"},
         total_reward=3.0,
     )
+
+
+def test_rollout_mode_uses_local_runner_for_network_only() -> None:
+    assert rollout_mode_for_env("network") == "local"
+    assert rollout_mode_for_env("hacker") == "hosted"
+    assert rollout_mode_for_env("deception") == "hosted"
+
+
+def test_get_rollout_api_supports_singular_rollout_client() -> None:
+    class FakeClient:
+        rollout = object()
+
+    assert get_rollout_api(FakeClient()) is FakeClient.rollout
+
+
+def test_build_agent_messages_uses_system_prompt_and_begin_user_turn() -> None:
+    messages = build_agent_messages("system prompt")
+    assert messages == [
+        {"role": "system", "content": "system prompt"},
+        {"role": "user", "content": "Begin."},
+    ]

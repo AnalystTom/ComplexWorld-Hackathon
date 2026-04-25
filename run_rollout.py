@@ -13,7 +13,7 @@ import json
 import os
 import sys
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from dotenv import load_dotenv
 
@@ -111,6 +111,25 @@ def infer_solved(
     return total_reward >= 1.0
 
 
+def rollout_mode_for_env(env_key: str) -> str:
+    return "local" if env_key == "network" else "hosted"
+
+
+def get_rollout_api(or_client: Any) -> Any:
+    if hasattr(or_client, "rollouts"):
+        return or_client.rollouts
+    if hasattr(or_client, "rollout"):
+        return or_client.rollout
+    raise AttributeError("OpenReward client has neither 'rollouts' nor 'rollout'")
+
+
+def build_agent_messages(system_prompt: str) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": "Begin."},
+    ]
+
+
 def _import_clients():
     try:
         from openai import OpenAI
@@ -124,25 +143,182 @@ def _import_clients():
     return OpenAI, OpenReward, RunInfo
 
 
-def run_rollout(
+def _import_network_local_runtime():
+    from network_benchmark.ors_env import (
+        EscalateParams,
+        ExploitParams,
+        ExfiltrateParams,
+        MoveParams,
+        NetworkBenchmarkEnv,
+        ScanParams,
+    )
+
+    params_by_tool = {
+        "scan": ScanParams,
+        "exploit": ExploitParams,
+        "move": MoveParams,
+        "escalate": EscalateParams,
+        "exfiltrate": ExfiltrateParams,
+    }
+    return NetworkBenchmarkEnv, params_by_tool
+
+
+def _tool_specs_from_local_env(
+    env: Any,
+    params_by_tool: dict[str, type[Any]],
+) -> list[dict[str, Any]]:
+    if hasattr(env, "list_tools"):
+        try:
+            listed = env.list_tools(format="openai")
+            if listed and isinstance(listed[0], dict):
+                return listed
+        except TypeError:
+            pass
+
+    return [
+        {
+            "type": "function",
+            "function": {
+                "name": tool_name,
+                "description": "",
+                "parameters": params_cls.model_json_schema(),
+            },
+        }
+        for tool_name, params_cls in params_by_tool.items()
+    ]
+
+
+def _run_local_network_rollout(
     *,
-    env_key: str,
-    split: str | None,
+    target: RolloutTarget,
+    chosen_split: str,
     task_index: int,
     model: str,
-    env_ref: str | None = None,
-    run_name: str | None = None,
-    verbose: bool = True,
+    oai_client: Any,
+    rollout_api: Any,
+    RunInfo: Any,
+    verbose: bool,
 ) -> float:
-    OpenAI, OpenReward, RunInfo = _import_clients()
-    target = get_rollout_target(env_key, env_ref_override=env_ref, run_name_override=run_name)
+    NetworkBenchmarkEnv, params_by_tool = _import_network_local_runtime()
+    tasks = NetworkBenchmarkEnv.list_tasks(chosen_split)
+    if task_index >= len(tasks):
+        print(f"Task index {task_index} out of range ({len(tasks)} tasks in split)")
+        sys.exit(1)
 
-    or_client = OpenReward(api_key=os.environ["OPENREWARD_API_KEY"])
-    oai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    task = tasks[task_index]
+    env = NetworkBenchmarkEnv(task_spec=task)
+    prompt_text = env.get_prompt()[0].text
+    tools = _tool_specs_from_local_env(env, params_by_tool)
 
+    total_reward = 0.0
+    step = 0
+    terminal_reward: float | None = None
+    terminal_metadata: dict[str, Any] | None = None
+
+    rollout = rollout_api.create(
+        run_name=target.run_name,
+        environment=target.env_ref,
+        split=chosen_split,
+        task_spec=task,
+        run_info=RunInfo(model_name=model),
+    )
+
+    messages = build_agent_messages(prompt_text)
+
+    if verbose:
+        print(f"\n{'=' * 60}")
+        print(f"ENV: {target.env_ref}  run: {target.run_name}")
+        print(f"Task: {summarize_task(task)}")
+        print(f"Model: {model}")
+        print(f"{'=' * 60}\n")
+
+    finished = False
+    while not finished and step < 160:
+        response = oai_client.chat.completions.create(
+            model=model,
+            tools=tools,
+            messages=messages,
+            tool_choice="required",
+            parallel_tool_calls=False,
+        )
+        msg = response.choices[0].message
+        msg_dict = msg.model_dump(exclude_unset=False)
+        messages.append(msg_dict)
+        rollout.log_openai_completions(msg_dict)
+
+        tool_calls = msg.tool_calls or []
+        if not tool_calls:
+            if verbose:
+                print("  [model stopped — no tool call]")
+            break
+
+        tool_results = []
+        for tool_call in tool_calls:
+            step += 1
+            args = json.loads(tool_call.function.arguments)
+            if verbose:
+                print(f"[{step:3d}] {tool_call.function.name}({json.dumps(args)})")
+
+            params_cls = params_by_tool[tool_call.function.name]
+            tool_result = getattr(env, tool_call.function.name)(params_cls.model_validate(args))
+            output_text = tool_result.blocks[0].text if tool_result.blocks else ""
+            reward = getattr(tool_result, "reward", None)
+            if reward is not None:
+                total_reward += reward
+
+            if verbose:
+                preview = output_text[:160].replace("\n", " ")
+                reward_str = f"  [r={reward:.3f}]" if reward is not None else ""
+                print(f"       {preview}{reward_str}")
+
+            if getattr(tool_result, "finished", False):
+                finished = True
+                terminal_reward = reward
+                terminal_metadata = getattr(tool_result, "metadata", None)
+
+            tool_results.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": output_text,
+                }
+            )
+
+        for tool_message in tool_results:
+            rollout.log_openai_completions(
+                tool_message,
+                reward=total_reward if finished else None,
+                is_finished=finished,
+            )
+
+        messages.extend(tool_results)
+
+    solved = infer_solved(
+        terminal_reward=terminal_reward,
+        terminal_metadata=terminal_metadata,
+        total_reward=total_reward,
+    )
+    print(f"\n{'=' * 60}")
+    print(f"{'SOLVED' if solved else 'FAILED'}  steps={step}  total_reward={total_reward:.3f}")
+    print("View run: https://openreward.ai")
+    print(f"{'=' * 60}")
+    return total_reward
+
+
+def _run_hosted_rollout(
+    *,
+    target: RolloutTarget,
+    chosen_split: str,
+    task_index: int,
+    model: str,
+    or_client: Any,
+    oai_client: Any,
+    rollout_api: Any,
+    RunInfo: Any,
+    verbose: bool,
+) -> float:
     environment = or_client.environments.get(name=target.env_ref)
     available_splits = [item.name for item in environment.list_splits()]
-    chosen_split = split or target.default_split
     if chosen_split not in available_splits:
         raise ValueError(
             f"Split {chosen_split!r} not available for {target.env_ref}; available splits: {available_splits}"
@@ -172,83 +348,84 @@ def run_rollout(
     terminal_reward: float | None = None
     terminal_metadata: dict[str, Any] | None = None
 
-    with or_client.rollouts as rollout_api:
-        rollout = rollout_api.create(
-            run_name=target.run_name,
-            environment=target.env_ref,
-            split=chosen_split,
-            task_spec=task,
-            run_info=RunInfo(model_name=model),
-        )
+    rollout = rollout_api.create(
+        run_name=target.run_name,
+        environment=target.env_ref,
+        split=chosen_split,
+        task_spec=task,
+        run_info=RunInfo(model_name=model),
+    )
 
-        with environment.session(task=task) as session:
-            prompt_text = session.get_prompt()[0].text
-            messages = [{"role": "user", "content": prompt_text}]
+    with environment.session(task=task) as session:
+        prompt_text = session.get_prompt()[0].text
+        messages = build_agent_messages(prompt_text)
 
-            if verbose:
-                print(f"\n{'=' * 60}")
-                print(f"ENV: {target.env_ref}  run: {target.run_name}")
-                print(f"Task: {summarize_task(task)}")
-                print(f"Model: {model}")
-                print(f"{'=' * 60}\n")
+        if verbose:
+            print(f"\n{'=' * 60}")
+            print(f"ENV: {target.env_ref}  run: {target.run_name}")
+            print(f"Task: {summarize_task(task)}")
+            print(f"Model: {model}")
+            print(f"{'=' * 60}\n")
 
-            finished = False
-            while not finished and step < 160:
-                response = oai_client.chat.completions.create(
-                    model=model,
-                    tools=tools,
-                    messages=messages,
+        finished = False
+        while not finished and step < 160:
+            response = oai_client.chat.completions.create(
+                model=model,
+                tools=tools,
+                messages=messages,
+                tool_choice="required",
+                parallel_tool_calls=False,
+            )
+            msg = response.choices[0].message
+            msg_dict = msg.model_dump(exclude_unset=False)
+            messages.append(msg_dict)
+            rollout.log_openai_completions(msg_dict)
+
+            tool_calls = msg.tool_calls or []
+            if not tool_calls:
+                if verbose:
+                    print("  [model stopped — no tool call]")
+                break
+
+            tool_results = []
+            for tool_call in tool_calls:
+                step += 1
+                args = json.loads(tool_call.function.arguments)
+                if verbose:
+                    print(f"[{step:3d}] {tool_call.function.name}({json.dumps(args)})")
+
+                tool_result = session.call_tool(tool_call.function.name, args)
+                output_text = tool_result.blocks[0].text if tool_result.blocks else ""
+                reward = getattr(tool_result, "reward", None)
+                if reward is not None:
+                    total_reward += reward
+
+                if verbose:
+                    preview = output_text[:160].replace("\n", " ")
+                    reward_str = f"  [r={reward:.3f}]" if reward is not None else ""
+                    print(f"       {preview}{reward_str}")
+
+                if getattr(tool_result, "finished", False):
+                    finished = True
+                    terminal_reward = reward
+                    terminal_metadata = getattr(tool_result, "metadata", None)
+
+                tool_results.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": output_text,
+                    }
                 )
-                msg = response.choices[0].message
-                msg_dict = msg.model_dump(exclude_unset=False)
-                messages.append(msg_dict)
-                rollout.log_openai_completions(msg_dict)
 
-                tool_calls = msg.tool_calls or []
-                if not tool_calls:
-                    if verbose:
-                        print("  [model stopped — no tool call]")
-                    break
+            for tool_message in tool_results:
+                rollout.log_openai_completions(
+                    tool_message,
+                    reward=total_reward if finished else None,
+                    is_finished=finished,
+                )
 
-                tool_results = []
-                for tool_call in tool_calls:
-                    step += 1
-                    args = json.loads(tool_call.function.arguments)
-                    if verbose:
-                        print(f"[{step:3d}] {tool_call.function.name}({json.dumps(args)})")
-
-                    tool_result = session.call_tool(tool_call.function.name, args)
-                    output_text = tool_result.blocks[0].text if tool_result.blocks else ""
-                    reward = getattr(tool_result, "reward", None)
-                    if reward is not None:
-                        total_reward += reward
-
-                    if verbose:
-                        preview = output_text[:160].replace("\n", " ")
-                        reward_str = f"  [r={reward:.3f}]" if reward is not None else ""
-                        print(f"       {preview}{reward_str}")
-
-                    if getattr(tool_result, "finished", False):
-                        finished = True
-                        terminal_reward = reward
-                        terminal_metadata = getattr(tool_result, "metadata", None)
-
-                    tool_results.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": output_text,
-                        }
-                    )
-
-                for tool_message in tool_results:
-                    rollout.log_openai_completions(
-                        tool_message,
-                        reward=total_reward if finished else None,
-                        is_finished=finished,
-                    )
-
-                messages.extend(tool_results)
+            messages.extend(tool_results)
 
     solved = infer_solved(
         terminal_reward=terminal_reward,
@@ -260,6 +437,48 @@ def run_rollout(
     print("View run: https://openreward.ai")
     print(f"{'=' * 60}")
     return total_reward
+
+
+def run_rollout(
+    *,
+    env_key: str,
+    split: str | None,
+    task_index: int,
+    model: str,
+    env_ref: str | None = None,
+    run_name: str | None = None,
+    verbose: bool = True,
+) -> float:
+    OpenAI, OpenReward, RunInfo = _import_clients()
+    target = get_rollout_target(env_key, env_ref_override=env_ref, run_name_override=run_name)
+
+    or_client = OpenReward(api_key=os.environ["OPENREWARD_API_KEY"])
+    oai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    chosen_split = split or target.default_split
+    rollout_api = get_rollout_api(or_client)
+
+    if rollout_mode_for_env(env_key) == "local":
+        return _run_local_network_rollout(
+            target=target,
+            chosen_split=chosen_split,
+            task_index=task_index,
+            model=model,
+            oai_client=oai_client,
+            rollout_api=rollout_api,
+            RunInfo=RunInfo,
+            verbose=verbose,
+        )
+    return _run_hosted_rollout(
+        target=target,
+        chosen_split=chosen_split,
+        task_index=task_index,
+        model=model,
+        or_client=or_client,
+        oai_client=oai_client,
+        rollout_api=rollout_api,
+        RunInfo=RunInfo,
+        verbose=verbose,
+    )
 
 
 def main() -> None:
