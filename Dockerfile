@@ -6,6 +6,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server.py .
+COPY environment.py .
+COPY filesystem_gen.py .
 COPY scenarios/ /orwd_data/scenarios/
 COPY tasks/ /orwd_data/tasks/
 COPY scenarios/compromised_laptop/base_tree.json /orwd_data/base_tree.json
