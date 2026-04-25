@@ -574,23 +574,14 @@
 
   <div style="margin: 0 auto; max-width: 760px; width: 100%;">
     <svg viewBox="0 0 760 460" preserveAspectRatio="xMidYMid meet" style="width: 100%; height: auto; display: block;">
-      <!-- Plot: x=80..720, y=40..400 -->
-      <!-- Faint dotted gridlines -->
-      <g stroke="#000" stroke-width="0.4" stroke-dasharray="2 4" opacity="0.25">
-        <line x1="80" y1="328" x2="720" y2="328"/>
-        <line x1="80" y1="256" x2="720" y2="256"/>
-        <line x1="80" y1="184" x2="720" y2="184"/>
-        <line x1="80" y1="112" x2="720" y2="112"/>
-        <line x1="263" y1="40" x2="263" y2="400"/>
-        <line x1="446" y1="40" x2="446" y2="400"/>
-        <line x1="629" y1="40" x2="629" y2="400"/>
-      </g>
+      <!-- Plot area: x=80..720 (640 wide), y=40..400 (360 tall) -->
+      <!-- X axis: 0..35,000 reasoning tokens; Y axis: 0..50 steps -->
 
       <!-- Axes -->
       <line x1="80" y1="400" x2="720" y2="400" stroke="#000" stroke-width="1"/>
-      <line x1="80" y1="40"  x2="80"  y2="400" stroke="#000" stroke-width="1"/>
+      <line x1="80" y1="40" x2="80" y2="400" stroke="#000" stroke-width="1"/>
 
-      <!-- Y-axis ticks -->
+      <!-- Y-axis ticks (steps) -->
       <g font-family="ui-monospace, monospace" font-size="11" fill="#000">
         <line x1="76" y1="328" x2="80" y2="328" stroke="#000"/><text x="72" y="332" text-anchor="end">10</text>
         <line x1="76" y1="256" x2="80" y2="256" stroke="#000"/><text x="72" y="260" text-anchor="end">20</text>
@@ -599,7 +590,7 @@
         <line x1="76" y1="40"  x2="80" y2="40"  stroke="#000"/><text x="72" y="44"  text-anchor="end">50</text>
       </g>
 
-      <!-- X-axis ticks -->
+      <!-- X-axis ticks (reasoning tokens, K) -->
       <g font-family="ui-monospace, monospace" font-size="11" fill="#000">
         <line x1="80"  y1="400" x2="80"  y2="404" stroke="#000"/><text x="80"  y="418" text-anchor="middle">0</text>
         <line x1="263" y1="400" x2="263" y2="404" stroke="#000"/><text x="263" y="418" text-anchor="middle">10K</text>
@@ -611,52 +602,56 @@
       <text x="400" y="442" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700">Mean reasoning tokens per win &rarr;</text>
       <text x="22" y="220" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="13" font-weight="700" transform="rotate(-90 22 220)">Mean steps per win &rarr;</text>
 
-      <!-- Pareto-optimal halo around gpt-5.5 -->
-      <circle cx="134.86" cy="248.8" r="26" fill="none" stroke="#000" stroke-width="1" stroke-dasharray="4 3" opacity="0.55"/>
+      <!-- Helper formulas (in comments):
+            x = 80 + (tokens / 35000) * 640
+            y = 400 - (steps / 50) * 360
+           gpt-5.5: tokens=3000, steps=21    -> x=80+54.86=134.86, y=400-151.2=248.8
+           gpt-5:   tokens=21000, steps=25   -> x=80+384=464,      y=400-180=220
+           o4-mini: tokens=30000, steps=29   -> x=80+548.6=628.6,  y=400-208.8=191.2
+           o3-high: tokens=26000, steps=46   -> x=80+475.4=555.4,  y=400-331.2=68.8
+      -->
 
-      <!-- Connector lines from gpt-5.5 to dominated points (subtle) -->
-      <g stroke="#000" stroke-width="0.4" opacity="0.25">
-        <line x1="134.86" y1="248.8" x2="464"   y2="220"/>
-        <line x1="134.86" y1="248.8" x2="628.6" y2="191.2"/>
-        <line x1="134.86" y1="248.8" x2="555.4" y2="68.8"/>
-      </g>
+      <!-- Pareto-optimal halo around gpt-5.5 -->
+      <circle cx="134.86" cy="248.8" r="22" fill="none" stroke="#000" stroke-width="0.5" stroke-dasharray="3 3"/>
 
       <!-- Dominated points (open circles) -->
-      <g>
-        <circle cx="464"   cy="220"   r="9" fill="#fff" stroke="#000" stroke-width="2"/>
-        <circle cx="628.6" cy="191.2" r="9" fill="#fff" stroke="#000" stroke-width="2"/>
-        <circle cx="555.4" cy="68.8"  r="9" fill="#fff" stroke="#000" stroke-width="2"/>
-      </g>
+      <circle cx="464"   cy="220"   r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
+      <circle cx="628.6" cy="191.2" r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
+      <circle cx="555.4" cy="68.8"  r="7" fill="#fff" stroke="#000" stroke-width="1.5"/>
 
-      <!-- Pareto-optimal point (filled circle, larger) -->
-      <circle cx="134.86" cy="248.8" r="11" fill="#000" stroke="#000" stroke-width="2"/>
+      <!-- Pareto-optimal point (filled circle) -->
+      <circle cx="134.86" cy="248.8" r="9" fill="#000" stroke="#000" stroke-width="1.5"/>
 
       <!-- Labels -->
-      <g font-family="-apple-system, sans-serif" fill="#000">
-        <text x="155" y="245" font-weight="700" font-size="14">gpt-5.5</text>
-        <text x="155" y="262" font-size="11" fill="#555" font-family="ui-monospace, monospace">3K tok &middot; 21 steps &middot; 100%</text>
-        <text x="155" y="282" font-size="11" fill="#000" font-style="italic" font-weight="700">⊳ Pareto-optimal</text>
+      <g font-family="ui-monospace, monospace" font-size="13" fill="#000">
+        <text x="155" y="245" font-weight="700">gpt-5.5</text>
+        <text x="151" y="262" font-size="10" fill="#555">3K tok &middot; 21 steps &middot; 100%</text>
 
-        <text x="480" y="217" font-weight="700" font-size="14">gpt-5</text>
-        <text x="480" y="234" font-size="11" fill="#555" font-family="ui-monospace, monospace">21K &middot; 25 &middot; 100%</text>
+        <text x="478" y="218" font-weight="700">gpt-5</text>
+        <text x="478" y="234" font-size="10" fill="#555">21K &middot; 25 &middot; 100%</text>
 
-        <text x="613" y="184" text-anchor="end" font-weight="700" font-size="14">o4-mini-high</text>
-        <text x="613" y="201" text-anchor="end" font-size="11" fill="#555" font-family="ui-monospace, monospace">30K &middot; 29 &middot; 100%</text>
+        <text x="612" y="186" text-anchor="end" font-weight="700">o4-mini-high</text>
+        <text x="612" y="202" text-anchor="end" font-size="10" fill="#555">30K &middot; 29 &middot; 100%</text>
 
-        <text x="540" y="64" text-anchor="end" font-weight="700" font-size="14">o3-high</text>
-        <text x="540" y="80" text-anchor="end" font-size="11" fill="#555" font-family="ui-monospace, monospace">26K &middot; 46 &middot; 64%</text>
+        <text x="540" y="64" text-anchor="end" font-weight="700">o3-high</text>
+        <text x="540" y="80" text-anchor="end" font-size="10" fill="#555">26K &middot; 46 &middot; 64%</text>
       </g>
 
-      <!-- "Better" arrow pointing into lower-left -->
-      <g stroke="#000" stroke-width="1.2" fill="none">
-        <path d="M 220 380 L 95 395" marker-end="url(#arr)"/>
+      <!-- "Better" arrow in lower-left -->
+      <g stroke="#000" stroke-width="1" fill="none">
+        <path d="M 200 360 L 100 380" marker-end="url(#arr)"/>
       </g>
       <defs>
-        <marker id="arr" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
-          <path d="M 0 0 L 8 5 L 0 10 z" fill="#000"/>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 6 4 L 0 8 z" fill="#000"/>
         </marker>
       </defs>
-      <text x="232" y="378" font-family="ui-monospace, monospace" font-size="11" fill="#555" font-style="italic">better</text>
+      <text x="210" y="358" font-family="ui-monospace, monospace" font-size="11" fill="#555">better</text>
+
+      <!-- Frontier annotation -->
+      <text x="155" y="285" font-family="ui-monospace, monospace" font-size="10" fill="#555" font-style="italic">
+        Pareto-optimal (dominates on both axes)
+      </text>
     </svg>
   </div>
 
