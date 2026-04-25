@@ -173,36 +173,57 @@
   }
   @media print {
     body { font-size: 14px; }
-    .slide { min-height: auto; padding: 32mm 28mm; }
+    .slide { min-height: auto; padding: 32mm 28mm; display: flex; }
+    nav.deck-nav { display: none !important; }
+    body.deck-nav-on .slide { display: flex !important; }
+  }
+  /* Slide navigation: only kicks in when JS adds .deck-nav-on. */
+  body.deck-nav-on .slide { display: none; }
+  body.deck-nav-on .slide.active { display: flex; }
+  nav.deck-nav {
+    position: fixed;
+    bottom: 18px;
+    right: 18px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 4px 6px;
+    font-family: var(--mono);
+    font-size: 12px;
+    z-index: 100;
+  }
+  nav.deck-nav button {
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    padding: 2px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 1.2;
+  }
+  nav.deck-nav button:hover { background: var(--ink); color: var(--paper); }
+  nav.deck-nav .nav-counter {
+    padding: 0 6px;
+    letter-spacing: 0.1em;
   }
 </style>
 </head>
 <body>
 
 <section class="slide">
-  <div class="slide-num">01 / 05</div>
-  <h1>DeceptionBench</h1>
-  <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
-
-  <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." />
-  <p class="hero-cap">scenario: dev's laptop, left at a coworking space</p>
-
-  <hr class="rule">
-
-  <ul>
-    <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
-    <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
-    <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
-  </ul>
-
-  <footer>
-    <span>DeceptionBench &middot; v3</span>
-    <span>OpenReward &middot; atman/DeceptionSearch-v0</span>
-  </footer>
+  <div class="slide-num">01 / 06</div>
 </section>
 
 <section class="slide">
-  <div class="slide-num">02 / 05</div>
+  <div class="slide-num">02 / 06</div>
+  <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." style="margin-top: 18vh; max-width: 640px;" />
+</section>
+
+<section class="slide">
+  <div class="slide-num">03 / 06</div>
   <h1>DeceptionBench</h1>
   <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
 
@@ -221,7 +242,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">03 / 05</div>
+  <div class="slide-num">04 / 06</div>
   <h2>Environment design</h2>
   <p class="lede">A simulated dev laptop populated by an OSS repo + LLM-authored decoys.</p>
 
@@ -269,7 +290,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">04 / 05</div>
+  <div class="slide-num">05 / 06</div>
   <h2>Methodology</h2>
   <p class="lede">Difficulty is dialed across four orthogonal axes.</p>
 
@@ -318,9 +339,9 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">05 / 05</div>
-  <h2>Headline results &mdash; v3</h2>
-  <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>. gpt-5.4 wins 29 of 30 trials across 3 seeds.</p>
+  <div class="slide-num">06 / 07</div>
+  <h2>Headline results &mdash; charts</h2>
+  <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>.</p>
 
   <div class="charts">
     <div class="chart">
@@ -461,6 +482,17 @@
     </div>
   </div>
 
+  <footer>
+    <span>Results &middot; charts</span>
+    <span>openreward.ai/atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">07 / 07</div>
+  <h2>Headline results &mdash; data &amp; takeaways</h2>
+  <p class="lede">Five reasoning models on v3 across 3 seeds; gpt-5.4 sample is 30 trials wide.</p>
+
   <table>
     <thead>
       <tr>
@@ -523,10 +555,48 @@
   </ul>
 
   <footer>
-    <span>Results &middot; 36 trials &middot; 3 seeds</span>
+    <span>Results &middot; data &middot; 3 seeds</span>
     <span>openreward.ai/atman/DeceptionSearch-v0</span>
   </footer>
 </section>
+
+<nav class="deck-nav" aria-label="Slide navigation">
+  <button id="nav-prev" type="button" title="Previous slide (←)">&larr;</button>
+  <span class="nav-counter" id="nav-counter">1 / 7</span>
+  <button id="nav-next" type="button" title="Next slide (→)">&rarr;</button>
+</nav>
+
+<script>
+(function () {
+  const slides = Array.from(document.querySelectorAll('section.slide'));
+  if (!slides.length) return;
+  document.body.classList.add('deck-nav-on');
+  let i = 0;
+
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, idx) => s.classList.toggle('active', idx === i));
+    document.getElementById('nav-counter').textContent = (i + 1) + ' / ' + slides.length;
+    if (location.hash !== '#' + (i + 1)) {
+      history.replaceState(null, '', '#' + (i + 1));
+    }
+  }
+
+  document.getElementById('nav-prev').addEventListener('click', () => show(i - 1));
+  document.getElementById('nav-next').addEventListener('click', () => show(i + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); show(i + 1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); show(i - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+    else if (/^[1-9]$/.test(e.key)) { const n = parseInt(e.key, 10) - 1; if (n < slides.length) show(n); }
+  });
+
+  const fromHash = parseInt((location.hash || '#1').slice(1), 10);
+  show(Number.isFinite(fromHash) ? fromHash - 1 : 0);
+})();
+</script>
 
 </body>
 </html>
