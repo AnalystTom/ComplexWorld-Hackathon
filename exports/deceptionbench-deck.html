@@ -132,17 +132,13 @@
   .chart text.value { text-anchor: start; }
   .chart .bar { fill: var(--ink); }
   .chart .axis { stroke: var(--ink); stroke-width: 0.5; }
-  .hero-grid {
-    display: grid;
-    grid-template-columns: 1.4fr 1fr;
-    gap: 48px;
-    align-items: start;
-  }
   .hero-img {
     border: 1px solid var(--ink);
+    display: block;
+    margin: 12px auto 6px;
+    max-width: 480px;
     width: 100%;
     height: auto;
-    display: block;
   }
   .hero-cap {
     font-family: var(--mono);
@@ -150,8 +146,9 @@
     color: var(--muted);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    margin-top: 8px;
-    text-align: right;
+    margin: 0 auto 22px;
+    text-align: center;
+    max-width: 480px;
   }
   .pull {
     font-family: var(--serif);
@@ -183,25 +180,20 @@
 <body>
 
 <section class="slide">
-  <div class="slide-num">01 / 04</div>
-  <div class="hero-grid">
-    <div>
-      <h1>DeceptionBench</h1>
-      <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
+  <div class="slide-num">01 / 05</div>
+  <h1>DeceptionBench</h1>
+  <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
 
-      <hr class="rule">
+  <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." />
+  <p class="hero-cap">scenario: dev's laptop, left at a coworking space</p>
 
-      <ul>
-        <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
-        <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
-        <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
-      </ul>
-    </div>
-    <div>
-      <img class="hero-img" src="assets/slide1.png" alt="Cheers, you have been hacked." />
-      <p class="hero-cap">scenario: dev's laptop, left at a coworking space</p>
-    </div>
-  </div>
+  <hr class="rule">
+
+  <ul>
+    <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
+    <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
+    <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
+  </ul>
 
   <footer>
     <span>DeceptionBench &middot; v3</span>
@@ -210,7 +202,26 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">02 / 04</div>
+  <div class="slide-num">02 / 05</div>
+  <h1>DeceptionBench</h1>
+  <p class="lede">Adversarial honeypot-survival as an LLM-agent benchmark.</p>
+
+  <hr class="rule">
+
+  <ul>
+    <li><strong>Question.</strong> Given a real credential planted in a filesystem alongside many LLM-generated lookalikes, can a frontier LLM agent identify the right one and bind it to the right "vault" — under a fixed action budget?</li>
+    <li><strong>Why it matters.</strong> Surface-pattern security tooling (regex / sigma rules) does not transfer to LLM-agent settings. Disambiguation requires <em>contextual reasoning under adversarial deception</em>, not retrieval.</li>
+    <li><strong>Sharp claim.</strong> Generating plausible deceptions is cheap; <em>detecting</em> them is the load-bearing capability. We measure the gap.</li>
+  </ul>
+
+  <footer>
+    <span>DeceptionBench &middot; v3</span>
+    <span>OpenReward &middot; atman/DeceptionSearch-v0</span>
+  </footer>
+</section>
+
+<section class="slide">
+  <div class="slide-num">03 / 05</div>
   <h2>Environment design</h2>
   <p class="lede">A simulated dev laptop populated by an OSS repo + LLM-authored decoys.</p>
 
@@ -258,7 +269,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">03 / 04</div>
+  <div class="slide-num">04 / 05</div>
   <h2>Methodology</h2>
   <p class="lede">Difficulty is dialed across four orthogonal axes.</p>
 
@@ -307,7 +318,7 @@
 </section>
 
 <section class="slide">
-  <div class="slide-num">04 / 04</div>
+  <div class="slide-num">05 / 05</div>
   <h2>Headline results &mdash; v3</h2>
   <p class="lede">All five reasoning models can solve v3. They diverge on <em>cost of solving</em>, not <em>capability</em>. gpt-5.4 wins 29 of 30 trials across 3 seeds.</p>
 
