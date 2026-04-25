@@ -9,10 +9,26 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
+GPT_RUN_NAME = "1777125694-gpt-5.4-task-0-v2-184f7c.json"
+BASELINE_RUN_NAME = "1777125081-exhaustive-task-0-v2-208c91.json"
+
+
+def _find_fixture_root(start: Path) -> Path:
+    for candidate in (start, *start.parents):
+        if (
+            (candidate / "runs" / GPT_RUN_NAME).exists()
+            and (candidate / "runs" / BASELINE_RUN_NAME).exists()
+            and (candidate / "tasks" / "smoke_v2.json").exists()
+        ):
+            return candidate
+    raise RuntimeError(f"Could not find fixture root from {start}")
+
+
+FIXTURE_ROOT = _find_fixture_root(REPO_ROOT)
 ANALYZER = REPO_ROOT / "scripts" / "analyze_trace.py"
-GPT_RUN = REPO_ROOT / "runs" / "1777125694-gpt-5.4-task-0-v2-184f7c.json"
-BASELINE_RUN = REPO_ROOT / "runs" / "1777125081-exhaustive-task-0-v2-208c91.json"
-TASK = REPO_ROOT / "tasks" / "smoke_v2.json"
+GPT_RUN = FIXTURE_ROOT / "runs" / GPT_RUN_NAME
+BASELINE_RUN = FIXTURE_ROOT / "runs" / BASELINE_RUN_NAME
+TASK = FIXTURE_ROOT / "tasks" / "smoke_v2.json"
 
 
 def _run_analyzer(*args: str) -> dict:
