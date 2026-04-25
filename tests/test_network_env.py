@@ -87,6 +87,8 @@ def test_linear_task_golden_path_reaches_goal() -> None:
         "escalate:admin",
         "exfiltrate:admin",
     ]
+    assert info["alerts"] == []
+    assert info["alert_history"] == []
 
 
 def test_delayed_rule_unlocks_prepared_node_after_one_step() -> None:
@@ -153,7 +155,29 @@ def test_repeated_exploit_on_compromised_node_does_not_pay_again() -> None:
     assert done is False
     assert info["result"] == "already_compromised"
     assert info["failed_actions"] == 1
+    assert info["alerts"] == ["already_compromised"]
+    assert info["alert_history"] == ["already_compromised"]
     assert info["compromised_nodes"] == ["web"]
+
+
+def test_final_payload_exposes_step_alerts_and_full_alert_history_separately() -> None:
+    env = _env("task_01_linear.yaml")
+
+    env.step({"action": "scan", "node": "initial_node"})
+    env.step({"action": "scan", "node": "web"})
+    env.step({"action": "exploit", "node": "web"})
+    env.step({"action": "move", "node": "db"})
+    env.step({"action": "move", "node": "admin"})
+    env.step({"action": "escalate", "node": "admin"})
+    obs, reward, done, info = env.step({"action": "exfiltrate", "node": "admin"})
+
+    assert reward == 5.0
+    assert done is True
+    assert info["result"] == "goal_reached"
+    assert info["alerts"] == []
+    assert info["alert_history"] == ["invalid_target"]
+    assert obs["alerts"] == []
+    assert obs["alert_history"] == ["invalid_target"]
 
 
 def test_repeated_move_revisit_does_not_pay_new_node_reward() -> None:

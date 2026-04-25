@@ -60,8 +60,8 @@ class NetworkBenchmarkStepEnv:
 
     def step(self, action: dict[str, Any]) -> tuple[dict[str, Any], float, bool, dict[str, Any]]:
         if self.state.done:
-            observation = self._build_observation("episode_complete")
-            info = self._build_info("episode_complete")
+            observation = self._build_observation("episode_complete", step_alerts=[])
+            info = self._build_info("episode_complete", step_alerts=[])
             return observation, 0.0, True, info
 
         self._apply_pending_rules()
@@ -91,7 +91,9 @@ class NetworkBenchmarkStepEnv:
 
         if reward < 0:
             self.state.failed_actions += 1
+        step_alerts: list[str] = []
         if alert:
+            step_alerts.append(alert)
             self.state.alerts.append(alert)
 
         if not self.state.exfiltrated and self.state.step_count >= self.world.max_steps:
@@ -100,9 +102,10 @@ class NetworkBenchmarkStepEnv:
             reward = REWARD_INVALID
             if not self.state.alerts or self.state.alerts[-1] != "step_limit_reached":
                 self.state.alerts.append("step_limit_reached")
+            step_alerts.append("step_limit_reached")
 
-        observation = self._build_observation(result)
-        info = self._build_info(result)
+        observation = self._build_observation(result, step_alerts=step_alerts)
+        info = self._build_info(result, step_alerts=step_alerts)
         return observation, reward, self.state.done, info
 
     def _handle_scan(self, node: str) -> tuple[float, str, str | None]:
@@ -247,7 +250,7 @@ class NetworkBenchmarkStepEnv:
         foothold_vulns = {service.vuln for service in node.services}
         return foothold_vulns.issubset({"none", "weak_auth"})
 
-    def _build_observation(self, result: str) -> dict[str, Any]:
+    def _build_observation(self, result: str, *, step_alerts: list[str]) -> dict[str, Any]:
         known_nodes = sorted(self.state.known_nodes)
         return {
             "task_id": self.world.task_id,
@@ -265,7 +268,8 @@ class NetworkBenchmarkStepEnv:
                 node_id: dict(self.state.host_state.get(node_id, {}))
                 for node_id in known_nodes
             },
-            "alerts": list(self.state.alerts),
+            "alerts": list(step_alerts),
+            "alert_history": list(self.state.alerts),
             "result": result,
             "step_count": self.state.step_count,
             "remaining_steps": max(0, self.world.max_steps - self.state.step_count),
@@ -273,7 +277,7 @@ class NetworkBenchmarkStepEnv:
             "trajectory": list(self.state.trajectory),
         }
 
-    def _build_info(self, result: str) -> dict[str, Any]:
+    def _build_info(self, result: str, *, step_alerts: list[str]) -> dict[str, Any]:
         expected_trace = list(self.world.expected_optimal_path)
         actual_trace = list(self.state.trajectory)
         return {
@@ -286,7 +290,8 @@ class NetworkBenchmarkStepEnv:
             "known_nodes": sorted(self.state.known_nodes),
             "compromised_nodes": sorted(self.state.compromised_nodes),
             "privileged_nodes": sorted(self.state.privileged_nodes),
-            "alerts": list(self.state.alerts),
+            "alerts": list(step_alerts),
+            "alert_history": list(self.state.alerts),
             "trajectory": actual_trace,
             "unique_nodes_compromised": len(self.state.compromised_nodes),
             "path_optimality": self._path_optimality(expected_trace, actual_trace),

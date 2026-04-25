@@ -86,6 +86,15 @@ def test_terminal_success_sets_finished_and_exposes_terminal_payload() -> None:
     assert payload["info"]["result"] == "goal_reached"
 
 
+def test_prompt_names_starting_node_and_forbids_placeholder_nodes() -> None:
+    env = NetworkBenchmarkEnv(task_spec=_task("task_01_linear.yaml"))
+
+    prompt = env.get_prompt()[0].text
+
+    assert "Your starting node is `web`." in prompt
+    assert "Do not invent placeholder node names such as `initial_node`." in prompt
+
+
 def test_adapter_matches_step_core_for_same_action_sequence() -> None:
     task_spec = _task("task_02_hidden_vuln.yaml")
     adapter = NetworkBenchmarkEnv(task_spec=task_spec)
