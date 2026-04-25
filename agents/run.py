@@ -81,6 +81,18 @@ def main() -> None:
         help="Directory to write per-session JSON logs",
     )
     ap.add_argument("--verbose", "-v", action="store_true")
+    ap.add_argument(
+        "--openreward",
+        choices=["auto", "on", "off"],
+        default="auto",
+        help="Mirror LLM rollouts to OpenReward. 'auto' enables when "
+             "OPENREWARD_API_KEY is set (default).",
+    )
+    ap.add_argument(
+        "--run-name",
+        default=None,
+        help="Run name to group rollouts on OpenReward. Default: timestamped.",
+    )
     args = ap.parse_args()
 
     # Server reads base_tree.json at module load time, so set the data dir
@@ -107,6 +119,27 @@ def main() -> None:
 
     from agents.harness import run_session
 
+    # OpenReward rollout mirroring (LLM agents only). Auto-on when key present.
+    or_enabled = (
+        args.openreward == "on"
+        or (args.openreward == "auto" and bool(os.environ.get("OPENREWARD_API_KEY")))
+    )
+    or_client = None
+    or_run_name = args.run_name or f"smoke-{int(__import__('time').time())}"
+    or_env_ref = os.environ.get("OPENREWARD_ENV_REF", "atman/DeceptionSearch-v0")
+    or_split = task_path.stem  # e.g. "smoke" from tasks/smoke.json
+    if or_enabled:
+        try:
+            from openreward.client import OpenReward
+            or_client = OpenReward()
+            print(
+                f"OpenReward: mirroring LLM rollouts to env={or_env_ref} "
+                f"run={or_run_name}"
+            )
+        except Exception as e:
+            print(f"OpenReward: disabled (init failed: {e})", file=sys.stderr)
+            or_client = None
+
     summary: list[dict[str, Any]] = []
     for agent_name in agents:
         for trial in range(args.trials):
@@ -119,11 +152,21 @@ def main() -> None:
                 f"\n=== {agent_name} (trial {trial+1}/{args.trials}) on "
                 f"task={task_spec['id']} ==="
             )
+            rollout = None
+            if or_client is not None and agent_name in ("haiku", "gpt54"):
+                rollout = or_client.rollout.create(
+                    run_name=or_run_name,
+                    rollout_name=f"{agent_name}-trial{trial+1}",
+                    environment=or_env_ref,
+                    split=or_split,
+                    task_spec=task_spec,
+                )
             log = run_session(
                 provider,
                 task_spec,
                 log_dir=log_dir,
                 verbose=args.verbose,
+                rollout=rollout,
             )
             md = log.get("metadata") or {}
             summary.append(
@@ -154,6 +197,15 @@ def main() -> None:
             f"{str(s['terminal_state']):<18} {str(s['step_count']):>5} "
             f"{str(s['honeypot_bites']):>5}"
         )
+
+    # Explicit drain so the terminal submit (reward=1.0, is_finished=True)
+    # uploads before atexit's shutdown handler kicks in. Avoids the
+    # "cannot schedule new futures after shutdown" race.
+    if or_client is not None:
+        try:
+            or_client.rollout.close()
+        except Exception as e:
+            print(f"OpenReward: rollout close failed: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

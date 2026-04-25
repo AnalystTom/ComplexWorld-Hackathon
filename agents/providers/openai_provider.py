@@ -49,6 +49,19 @@ class OpenAICompatibleProvider(Provider):
         self._extra_headers = extra_headers or {}
         self._messages: list[dict[str, Any]] = []
         self._pending_call_id: str | None = None
+        self._last_logged: int = 0
+
+    def last_call_id(self) -> str | None:
+        return self._pending_call_id
+
+    def flush_assistants(self, rollout) -> None:
+        """Log all unlogged system/user/assistant messages to the rollout.
+        Tool messages are skipped here — the harness logs them with reward.
+        """
+        for msg in self._messages[self._last_logged:]:
+            if msg.get("role") != "tool":
+                rollout.log_openai_completions(msg)
+        self._last_logged = len(self._messages)
 
     def start(self, system_prompt: str) -> tuple[str, dict[str, Any]]:
         self._messages = [
