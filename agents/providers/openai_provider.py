@@ -74,6 +74,7 @@ class OpenAICompatibleProvider(Provider):
             "messages": self._messages,
             "tools": self.tools,
             "tool_choice": "required",
+            "parallel_tool_calls": False,
             "max_completion_tokens": self.max_completion_tokens,
         }
         if self._explicit_temp:
@@ -83,7 +84,13 @@ class OpenAICompatibleProvider(Provider):
         response = self.client.chat.completions.create(**kwargs)
         choice = response.choices[0]
         msg = choice.message
-        self._messages.append(msg.model_dump(exclude_none=True))
+        # Re-serialise the assistant message; if the model emitted parallel
+        # tool calls anyway (older Anthropic via OpenRouter sometimes does),
+        # keep only the first so the next user/tool reply round-trips cleanly.
+        m = msg.model_dump(exclude_none=True)
+        if m.get("tool_calls") and len(m["tool_calls"]) > 1:
+            m["tool_calls"] = m["tool_calls"][:1]
+        self._messages.append(m)
         if not msg.tool_calls:
             raise RuntimeError(
                 f"{self.name} returned no tool_calls; "

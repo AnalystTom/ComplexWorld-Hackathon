@@ -261,7 +261,7 @@ def make_deceiver_caller() -> tuple[DeceiverFn, str]:
             api_key=os.environ["OPENROUTER_API_KEY"],
             base_url="https://openrouter.ai/api/v1",
         )
-        model = os.environ.get("DECEIVER_MODEL", "google/gemini-3-flash")
+        model = os.environ.get("DECEIVER_MODEL", "google/gemini-3-flash-preview")
 
         def call(prompt: str, error_feedback: str = "") -> tuple[dict, str]:
             return _call_deceiver_openai_compat(client, model, prompt, error_feedback)

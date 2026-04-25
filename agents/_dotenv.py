@@ -25,6 +25,13 @@ def load(path: Path | None = None) -> None:
         key, _, val = line.partition("=")
         key = key.strip()
         val = val.strip()
+        # Strip inline comments: value followed by whitespace then # ... eol.
+        # Only outside quotes; tokens like "value#tag" stay intact.
+        if val and val[0] not in ("'", '"'):
+            for i, ch in enumerate(val):
+                if ch == "#" and i > 0 and val[i - 1].isspace():
+                    val = val[:i].rstrip()
+                    break
         # Strip surrounding quotes.
         if len(val) >= 2 and val[0] == val[-1] and val[0] in ("'", '"'):
             val = val[1:-1]
